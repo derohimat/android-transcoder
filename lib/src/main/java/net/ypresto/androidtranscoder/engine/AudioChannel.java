@@ -9,6 +9,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
 import java.util.ArrayDeque;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Queue;
 
 /**
@@ -31,10 +33,12 @@ class AudioChannel {
     private static final int BYTES_PER_SHORT = 2;
     private static final long MICROSECS_PER_SEC = 1000000;
 
-    private final Queue<AudioBuffer> mEmptyBuffers = new ArrayDeque<>();
-    private final Queue<AudioBuffer> mFilledBuffers = new ArrayDeque<>();
+    private final LinkedHashMap<String, Queue<AudioBuffer>> mEmptyBuffers;
+    private final LinkedHashMap<String, Queue<AudioBuffer>> mFilledBuffers;
 
-    private final MediaCodec mDecoder;
+    private final Queue<AudioBuffer> mFilledBuffers2 = new ArrayDeque<>();
+
+    private final LinkedHashMap<String, MediaCodec> mDecoders;
     private final MediaCodec mEncoder;
     private final MediaFormat mEncodeFormat;
 
@@ -44,7 +48,7 @@ class AudioChannel {
 
     private AudioRemixer mRemixer;
 
-    private final MediaCodecBufferCompatWrapper mDecoderBuffers;
+    private final LinkedHashMap<String, MediaCodecBufferCompatWrapper> mDecoderBuffers;
     private final MediaCodecBufferCompatWrapper mEncoderBuffers;
 
     private final AudioBuffer mOverflowBuffer = new AudioBuffer();
@@ -52,13 +56,23 @@ class AudioChannel {
     private MediaFormat mActualDecodedFormat;
 
 
-    public AudioChannel(final MediaCodec decoder,
+    public AudioChannel(final LinkedHashMap<String, MediaCodec> decoders,
                         final MediaCodec encoder, final MediaFormat encodeFormat) {
-        mDecoder = decoder;
+        mDecoders = decoders;
         mEncoder = encoder;
         mEncodeFormat = encodeFormat;
+        mDecoderBuffers = new LinkedHashMap<String, MediaCodecBufferCompatWrapper>();
+        mEmptyBuffers = new LinkedHashMap<String, Queue<AudioBuffer>>();
+        mFilledBuffers = new LinkedHashMap<String, Queue<AudioBuffer>>();
 
-        mDecoderBuffers = new MediaCodecBufferCompatWrapper(mDecoder);
+        for (Map.Entry<String, MediaCodec> entry : mDecoders.entrySet()) {
+            MediaCodec decoder = entry.getValue();
+            mDecoderBuffers.put(entry.getKey(), new MediaCodecBufferCompatWrapper(decoder));
+            Queue<AudioBuffer> empty = new ArrayDeque<>();
+            Queue<AudioBuffer> filled = new ArrayDeque<>();
+            mEmptyBuffers.put(entry.getKey(), empty);
+            mFilledBuffers.put(entry.getKey(), filled);
+        }
         mEncoderBuffers = new MediaCodecBufferCompatWrapper(mEncoder);
     }
 
@@ -91,17 +105,21 @@ class AudioChannel {
 
         mOverflowBuffer.presentationTimeUs = 0;
     }
+    public MediaFormat getDeterminedFormat() {
+        return mActualDecodedFormat;
+    }
+    public void drainDecoderBufferAndQueue(String input, final int bufferIndex, final long presentationTimeUs) {
 
-    public void drainDecoderBufferAndQueue(final int bufferIndex, final long presentationTimeUs) {
+        MediaCodecBufferCompatWrapper decoderBuffer = mDecoderBuffers.get(input);
         if (mActualDecodedFormat == null) {
             throw new RuntimeException("Buffer received before format!");
         }
 
         final ByteBuffer data =
                 bufferIndex == BUFFER_INDEX_END_OF_STREAM ?
-                        null : mDecoderBuffers.getOutputBuffer(bufferIndex);
+                        null : decoderBuffer.getOutputBuffer(bufferIndex);
 
-        AudioBuffer buffer = mEmptyBuffers.poll();
+        AudioBuffer buffer = mEmptyBuffers.get(input).poll();
         if (buffer == null) {
             buffer = new AudioBuffer();
         }
@@ -118,7 +136,7 @@ class AudioChannel {
             mOverflowBuffer.data.clear().flip();
         }
 
-        mFilledBuffers.add(buffer);
+        mFilledBuffers.get(input).add(buffer);
     }
 
     public boolean feedEncoder(long timeoutUs) {
@@ -135,31 +153,37 @@ class AudioChannel {
         }
 
         // Drain overflow first
-        final ShortBuffer outBuffer = mEncoderBuffers.getInputBuffer(encoderInBuffIndex).asShortBuffer();
+        final ShortBuffer encoderBuffer = mEncoderBuffers.getInputBuffer(encoderInBuffIndex).asShortBuffer();
         if (hasOverflow) {
-            final long presentationTimeUs = drainOverflow(outBuffer);
+            final long presentationTimeUs = drainOverflow(encoderBuffer);
             mEncoder.queueInputBuffer(encoderInBuffIndex,
-                    0, outBuffer.position() * BYTES_PER_SHORT,
+                    0, encoderBuffer.position() * BYTES_PER_SHORT,
                     presentationTimeUs, 0);
             return true;
         }
-
-        final AudioBuffer inBuffer = mFilledBuffers.poll();
-        if (inBuffer.bufferIndex == BUFFER_INDEX_END_OF_STREAM) {
+        boolean streamPresent = false;
+        long presentationTimeUs  = 0;
+        for (Map.Entry<String, Queue<AudioBuffer>> entry : mFilledBuffers.entrySet()) {
+            Queue<AudioBuffer> filledBuffers = entry.getValue();
+            final AudioBuffer decoderBuffer = filledBuffers.poll();
+            if (decoderBuffer.bufferIndex != BUFFER_INDEX_END_OF_STREAM) {
+                streamPresent = true;
+                presentationTimeUs = remixAndMaybeFillOverflow(decoderBuffer, encoderBuffer);
+                if (decoderBuffer != null) {
+                    mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
+                    mEmptyBuffers.get(entry.getKey()).add(decoderBuffer);
+                }
+            }
+        }
+        if (!streamPresent) {
             mEncoder.queueInputBuffer(encoderInBuffIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
             return false;
+        } else {
+            mEncoder.queueInputBuffer(encoderInBuffIndex,
+                    0, encoderBuffer.position() * BYTES_PER_SHORT,
+                    presentationTimeUs, 0);
+            return true;
         }
-
-        final long presentationTimeUs = remixAndMaybeFillOverflow(inBuffer, outBuffer);
-        mEncoder.queueInputBuffer(encoderInBuffIndex,
-                0, outBuffer.position() * BYTES_PER_SHORT,
-                presentationTimeUs, 0);
-        if (inBuffer != null) {
-            mDecoder.releaseOutputBuffer(inBuffer.bufferIndex, false);
-            mEmptyBuffers.add(inBuffer);
-        }
-
-        return true;
     }
 
     private static long sampleCountToDurationUs(final int sampleCount,

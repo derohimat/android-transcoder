@@ -26,6 +26,9 @@ import net.ypresto.androidtranscoder.utils.MediaExtractorUtils;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Internal engine, do not use this directly.
@@ -36,10 +39,10 @@ public class MediaTranscoderEngine {
     private static final double PROGRESS_UNKNOWN = -1.0;
     private static final long SLEEP_TO_WAIT_TRACK_TRANSCODERS = 10;
     private static final long PROGRESS_INTERVAL_STEPS = 10;
-    private FileDescriptor mInputFileDescriptor;
+    private LinkedHashMap<String, FileDescriptor> mInputFileDescriptor;
     private TrackTranscoder mVideoTrackTranscoder;
     private TrackTranscoder mAudioTrackTranscoder;
-    private MediaExtractor mExtractor;
+    private LinkedHashMap<String, MediaExtractor> mExtractor;
     private MediaMuxer mMuxer;
     private volatile double mProgress;
     private ProgressCallback mProgressCallback;
@@ -49,10 +52,15 @@ public class MediaTranscoderEngine {
      * Do not use this constructor unless you know what you are doing.
      */
     public MediaTranscoderEngine() {
+        mInputFileDescriptor = new LinkedHashMap<String, FileDescriptor>();
+        mExtractor = new LinkedHashMap<String, MediaExtractor>();
     }
 
     public void setDataSource(FileDescriptor fileDescriptor) {
-        mInputFileDescriptor = fileDescriptor;
+        setDataSource(fileDescriptor, "default");
+    }
+    public void setDataSource(FileDescriptor fileDescriptor, String name) {
+        mInputFileDescriptor.put(name, fileDescriptor);
     }
 
     public ProgressCallback getProgressCallback() {
@@ -89,8 +97,11 @@ public class MediaTranscoderEngine {
         }
         try {
             // NOTE: use single extractor to keep from running out audio track fast.
-            mExtractor = new MediaExtractor();
-            mExtractor.setDataSource(mInputFileDescriptor);
+            for (Map.Entry<String, FileDescriptor> entry : mInputFileDescriptor.entrySet()) {
+                MediaExtractor m = new MediaExtractor();
+                m.setDataSource(entry.getValue());
+                mExtractor.put(entry.getKey(), m);
+            }
             mMuxer = new MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             setupMetadata();
             setupTrackTranscoders(formatStrategy);
@@ -106,9 +117,8 @@ public class MediaTranscoderEngine {
                     mAudioTrackTranscoder.release();
                     mAudioTrackTranscoder = null;
                 }
-                if (mExtractor != null) {
-                    mExtractor.release();
-                    mExtractor = null;
+                for (Map.Entry<String, MediaExtractor> entry : mExtractor.entrySet()) {
+                    entry.getValue().release();
                 }
             } catch (RuntimeException e) {
                 // Too fatal to make alive the app, because it may leak native resources.
@@ -128,7 +138,7 @@ public class MediaTranscoderEngine {
 
     private void setupMetadata() throws IOException {
         MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
-        mediaMetadataRetriever.setDataSource(mInputFileDescriptor);
+        mediaMetadataRetriever.setDataSource(mInputFileDescriptor.entrySet().iterator().next().getValue());
 
         String rotationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
         try {
@@ -150,9 +160,23 @@ public class MediaTranscoderEngine {
     }
 
     private void setupTrackTranscoders(MediaFormatStrategy formatStrategy) {
-        MediaExtractorUtils.TrackResult trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(mExtractor);
-        MediaFormat videoOutputFormat = formatStrategy.createVideoOutputFormat(trackResult.mVideoTrackFormat);
-        MediaFormat audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat);
+
+        // Find the first vidoe and audio track to establish an interim output format
+        MediaFormat videoOutputFormat = null;
+        MediaFormat audioOutputFormat = null;
+        MediaExtractorUtils.TrackResult trackResult = null;
+        for (Map.Entry<String, MediaExtractor> entry : mExtractor.entrySet()) {
+            trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(entry.getValue());
+            MediaExtractor extractor = mExtractor.get(entry.getKey());
+            if (videoOutputFormat == null && trackResult.mVideoTrackFormat != null) {
+                videoOutputFormat = formatStrategy.createVideoOutputFormat(trackResult.mVideoTrackFormat);
+            }
+            if (audioOutputFormat == null && trackResult.mAudioTrackFormat != null) {
+                audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat);
+            }
+            extractor.selectTrack(trackResult.mVideoTrackIndex);
+            extractor.selectTrack(trackResult.mAudioTrackIndex);
+        }
         if (videoOutputFormat == null && audioOutputFormat == null) {
             throw new InvalidOutputFormatException("MediaFormatStrategy returned pass-through for both video and audio. No transcoding is necessary.");
         }
@@ -164,21 +188,19 @@ public class MediaTranscoderEngine {
             }
         });
 
-        if (videoOutputFormat == null) {
-            mVideoTrackTranscoder = new PassThroughTrackTranscoder(mExtractor, trackResult.mVideoTrackIndex, queuedMuxer, QueuedMuxer.SampleType.VIDEO);
+        if (videoOutputFormat == null && trackResult != null) {
+            mVideoTrackTranscoder = new PassThroughTrackTranscoder(mExtractor.entrySet().iterator().next().getValue(), trackResult.mVideoTrackIndex, queuedMuxer, QueuedMuxer.SampleType.VIDEO);
         } else {
-            mVideoTrackTranscoder = new VideoTrackTranscoder(mExtractor, trackResult.mVideoTrackIndex, videoOutputFormat, queuedMuxer);
+            mVideoTrackTranscoder = new VideoTrackTranscoder(mExtractor, videoOutputFormat, queuedMuxer);
         }
         mVideoTrackTranscoder.setup();
         if (audioOutputFormat == null) {
-            mAudioTrackTranscoder = new PassThroughTrackTranscoder(mExtractor, trackResult.mAudioTrackIndex, queuedMuxer, QueuedMuxer.SampleType.AUDIO);
+            mAudioTrackTranscoder = new PassThroughTrackTranscoder(mExtractor.entrySet().iterator().next().getValue(), trackResult.mAudioTrackIndex, queuedMuxer, QueuedMuxer.SampleType.AUDIO);
         } else {
-            mAudioTrackTranscoder = new AudioTrackTranscoder(mExtractor, trackResult.mAudioTrackIndex, audioOutputFormat, queuedMuxer);
+            mAudioTrackTranscoder = new AudioTrackTranscoder(mExtractor,  audioOutputFormat, queuedMuxer);
         }
         mAudioTrackTranscoder.setup();
-        mExtractor.selectTrack(trackResult.mVideoTrackIndex);
-        mExtractor.selectTrack(trackResult.mAudioTrackIndex);
-    }
+        }
 
     private void runPipelines() {
         long loopCount = 0;

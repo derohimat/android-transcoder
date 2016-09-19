@@ -20,9 +20,13 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 
 import net.ypresto.androidtranscoder.format.MediaFormatExtraConstants;
+import net.ypresto.androidtranscoder.utils.MediaExtractorUtils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 // Refer: https://android.googlesource.com/platform/cts/+/lollipop-release/tests/tests/media/src/android/media/cts/ExtractDecodeEditEncodeMuxTest.java
 public class VideoTrackTranscoder implements TrackTranscoder {
@@ -31,18 +35,18 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private static final int DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY = 1;
     private static final int DRAIN_STATE_CONSUMED = 2;
 
-    private final MediaExtractor mExtractor;
-    private final int mTrackIndex;
+    private final LinkedHashMap<String, MediaExtractor> mExtractor;
     private final MediaFormat mOutputFormat;
     private final QueuedMuxer mMuxer;
     private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
-    private MediaCodec mDecoder;
+    private LinkedHashMap<String, MediaCodec> mDecoder;
     private MediaCodec mEncoder;
-    private ByteBuffer[] mDecoderInputBuffers;
+    private LinkedHashMap<String, ByteBuffer[]> mDecoderInputBuffers;
     private ByteBuffer[] mEncoderOutputBuffers;
     private MediaFormat mActualOutputFormat;
-    private OutputSurface mDecoderOutputSurfaceWrapper;
+    private LinkedHashMap<String, OutputSurface> mDecoderOutputSurfaceWrapper;
     private InputSurface mEncoderInputSurfaceWrapper;
+    private LinkedHashMap<String, Integer> mTrackIndex;
     private boolean mIsExtractorEOS;
     private boolean mIsDecoderEOS;
     private boolean mIsEncoderEOS;
@@ -50,17 +54,19 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private boolean mEncoderStarted;
     private long mWrittenPresentationTimeUs;
 
-    public VideoTrackTranscoder(MediaExtractor extractor, int trackIndex,
+    public VideoTrackTranscoder(LinkedHashMap<String, MediaExtractor> extractor,
                                 MediaFormat outputFormat, QueuedMuxer muxer) {
         mExtractor = extractor;
-        mTrackIndex = trackIndex;
         mOutputFormat = outputFormat;
         mMuxer = muxer;
+        mDecoder = new LinkedHashMap<String, MediaCodec>();
+        mDecoderInputBuffers = new LinkedHashMap<String, ByteBuffer[]>();
+        mDecoderOutputSurfaceWrapper = new LinkedHashMap<String, OutputSurface>();
+        mTrackIndex = new LinkedHashMap<String, Integer>();
     }
 
     @Override
     public void setup() {
-        mExtractor.selectTrack(mTrackIndex);
         try {
             mEncoder = MediaCodec.createEncoderByType(mOutputFormat.getString(MediaFormat.KEY_MIME));
         } catch (IOException e) {
@@ -73,23 +79,34 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         mEncoderStarted = true;
         mEncoderOutputBuffers = mEncoder.getOutputBuffers();
 
-        MediaFormat inputFormat = mExtractor.getTrackFormat(mTrackIndex);
-        if (inputFormat.containsKey(MediaFormatExtraConstants.KEY_ROTATION_DEGREES)) {
-            // Decoded video is rotated automatically in Android 5.0 lollipop.
-            // Turn off here because we don't want to encode rotated one.
-            // refer: https://android.googlesource.com/platform/frameworks/av/+blame/lollipop-release/media/libstagefright/Utils.cpp
-            inputFormat.setInteger(MediaFormatExtraConstants.KEY_ROTATION_DEGREES, 0);
+        for (Map.Entry<String, MediaExtractor> entry : mExtractor.entrySet()) {
+            MediaExtractorUtils.TrackResult trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(entry.getValue());
+            if (trackResult.mVideoTrackFormat != null) {
+                int trackIndex = trackResult.mVideoTrackIndex;
+                mTrackIndex.put(entry.getKey(), trackIndex);
+                entry.getValue().selectTrack(trackIndex);
+                MediaFormat inputFormat = entry.getValue().getTrackFormat(trackIndex);
+                if (inputFormat.containsKey(MediaFormatExtraConstants.KEY_ROTATION_DEGREES)) {
+                    // Decoded video is rotated automatically in Android 5.0 lollipop.
+                    // Turn off here because we don't want to encode rotated one.
+                    // refer: https://android.googlesource.com/platform/frameworks/av/+blame/lollipop-release/media/libstagefright/Utils.cpp
+                    inputFormat.setInteger(MediaFormatExtraConstants.KEY_ROTATION_DEGREES, 0);
+                }
+                OutputSurface decoderOutputSurfaceWrapper = new OutputSurface();
+                mDecoderOutputSurfaceWrapper.put(entry.getKey(), decoderOutputSurfaceWrapper);
+                MediaCodec decoder = null;
+                try {
+                    decoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+                } catch (IOException e) {
+                    throw new IllegalStateException(e);
+                }
+                decoder.configure(inputFormat, decoderOutputSurfaceWrapper.getSurface(), null, 0);
+                decoder.start();
+                mDecoder.put(entry.getKey(), decoder);
+                mDecoderStarted = true;
+                mDecoderInputBuffers.put(entry.getKey(), decoder.getInputBuffers());
+            }
         }
-        mDecoderOutputSurfaceWrapper = new OutputSurface();
-        try {
-            mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
-        mDecoder.configure(inputFormat, mDecoderOutputSurfaceWrapper.getSurface(), null, 0);
-        mDecoder.start();
-        mDecoderStarted = true;
-        mDecoderInputBuffers = mDecoder.getInputBuffers();
     }
 
     @Override
@@ -127,7 +144,9 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     @Override
     public void release() {
         if (mDecoderOutputSurfaceWrapper != null) {
-            mDecoderOutputSurfaceWrapper.release();
+            for (Map.Entry<String, OutputSurface> entry : mDecoderOutputSurfaceWrapper.entrySet()) {
+                entry.getValue().release();
+            }
             mDecoderOutputSurfaceWrapper = null;
         }
         if (mEncoderInputSurfaceWrapper != null) {
@@ -135,8 +154,12 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             mEncoderInputSurfaceWrapper = null;
         }
         if (mDecoder != null) {
-            if (mDecoderStarted) mDecoder.stop();
-            mDecoder.release();
+            if (mDecoderStarted) {
+                for (Map.Entry<String, MediaCodec> entry : mDecoder.entrySet()) {
+                    entry.getValue().stop();
+                    entry.getValue().release();
+                }
+            }
             mDecoder = null;
         }
         if (mEncoder != null) {
@@ -148,49 +171,65 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
     private int drainExtractor(long timeoutUs) {
         if (mIsExtractorEOS) return DRAIN_STATE_NONE;
-        int trackIndex = mExtractor.getSampleTrackIndex();
-        if (trackIndex >= 0 && trackIndex != mTrackIndex) {
-            return DRAIN_STATE_NONE;
+        for (Map.Entry<String, MediaCodec> entry : mDecoder.entrySet()) {
+            MediaExtractor extractor = mExtractor.get(entry.getKey());
+            MediaCodec decoder = entry.getValue();
+            int trackIndex = extractor.getSampleTrackIndex();
+            if (trackIndex >= 0 && trackIndex != mTrackIndex.get(entry.getKey())) {
+                return DRAIN_STATE_NONE;
+            }
+            int result = decoder.dequeueInputBuffer(timeoutUs);
+            if (result < 0) return DRAIN_STATE_NONE;
+            if (trackIndex < 0) {
+                mIsExtractorEOS = true;
+                decoder.queueInputBuffer(result, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                return DRAIN_STATE_NONE;
+            }
+            int sampleSize = extractor.readSampleData(mDecoderInputBuffers.get(entry.getKey())[result], 0);
+            boolean isKeyFrame = (extractor.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0;
+            decoder.queueInputBuffer(result, 0, sampleSize, extractor.getSampleTime(), isKeyFrame ? MediaCodec.BUFFER_FLAG_SYNC_FRAME : 0);
+            extractor.advance();
         }
-        int result = mDecoder.dequeueInputBuffer(timeoutUs);
-        if (result < 0) return DRAIN_STATE_NONE;
-        if (trackIndex < 0) {
-            mIsExtractorEOS = true;
-            mDecoder.queueInputBuffer(result, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-            return DRAIN_STATE_NONE;
-        }
-        int sampleSize = mExtractor.readSampleData(mDecoderInputBuffers[result], 0);
-        boolean isKeyFrame = (mExtractor.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0;
-        mDecoder.queueInputBuffer(result, 0, sampleSize, mExtractor.getSampleTime(), isKeyFrame ? MediaCodec.BUFFER_FLAG_SYNC_FRAME : 0);
-        mExtractor.advance();
         return DRAIN_STATE_CONSUMED;
     }
 
     private int drainDecoder(long timeoutUs) {
-        if (mIsDecoderEOS) return DRAIN_STATE_NONE;
-        int result = mDecoder.dequeueOutputBuffer(mBufferInfo, timeoutUs);
-        switch (result) {
-            case MediaCodec.INFO_TRY_AGAIN_LATER:
-                return DRAIN_STATE_NONE;
-            case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
-            case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
-                return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
+        if (mIsDecoderEOS)
+            return DRAIN_STATE_NONE;
+        int decoderCount = 0;
+        int eosCount = 0;
+        for (Map.Entry<String, MediaCodec> entry : mDecoder.entrySet()) {
+            MediaCodec decoder = entry.getValue();
+            OutputSurface decoderOutputSurfaceWrapper = mDecoderOutputSurfaceWrapper.get(entry.getKey());
+            int result = decoder.dequeueOutputBuffer(mBufferInfo, timeoutUs);
+            switch (result) {
+                case MediaCodec.INFO_TRY_AGAIN_LATER:
+                    return DRAIN_STATE_NONE;
+                case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
+                case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
+                    return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
+            }
+            if ((mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                mBufferInfo.size = 0;
+                eosCount++;
+            }
+            boolean doRender = (mBufferInfo.size > 0);
+            // NOTE: doRender will block if buffer (of encoder) is full.
+            // Refer: http://bigflake.com/mediacodec/CameraToMpegTest.java.txt
+            decoder.releaseOutputBuffer(result, doRender);
+            if (doRender) {
+                decoderOutputSurfaceWrapper.awaitNewImage();
+                decoderOutputSurfaceWrapper.drawImage();
+                mEncoderInputSurfaceWrapper.setPresentationTime(mBufferInfo.presentationTimeUs * 1000);
+                mEncoderInputSurfaceWrapper.swapBuffers();
+            }
+            decoderCount++;
         }
-        if ((mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+        if (eosCount == decoderCount) {
             mEncoder.signalEndOfInputStream();
             mIsDecoderEOS = true;
-            mBufferInfo.size = 0;
         }
-        boolean doRender = (mBufferInfo.size > 0);
-        // NOTE: doRender will block if buffer (of encoder) is full.
-        // Refer: http://bigflake.com/mediacodec/CameraToMpegTest.java.txt
-        mDecoder.releaseOutputBuffer(result, doRender);
-        if (doRender) {
-            mDecoderOutputSurfaceWrapper.awaitNewImage();
-            mDecoderOutputSurfaceWrapper.drawImage();
-            mEncoderInputSurfaceWrapper.setPresentationTime(mBufferInfo.presentationTimeUs * 1000);
-            mEncoderInputSurfaceWrapper.swapBuffers();
-        }
+
         return DRAIN_STATE_CONSUMED;
     }
 

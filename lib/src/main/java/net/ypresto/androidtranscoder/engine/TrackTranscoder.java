@@ -19,7 +19,8 @@ import android.media.MediaFormat;
 
 public interface TrackTranscoder {
 
-    void setup();
+    void setupEncoder();
+    void setupDecoder(OutputSegment outputSegment);
 
     /**
      * Get actual MediaFormat which is used to write to muxer.
@@ -35,7 +36,7 @@ public interface TrackTranscoder {
      *
      * @return true if data moved in pipeline.
      */
-    boolean stepPipeline();
+    boolean stepPipeline(OutputSegment outputSegment);
 
     /**
      * Get presentation time of last sample written to muxer.
@@ -44,7 +45,8 @@ public interface TrackTranscoder {
      */
     long getWrittenPresentationTimeUs();
 
-    boolean isFinished();
+    boolean isSegmentFinished();
 
-    void release();
+    void releaseDecoder(OutputSegment outputSegment);
+    void releaseEncoder();
 }

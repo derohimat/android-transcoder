@@ -26,8 +26,9 @@ import net.ypresto.androidtranscoder.utils.MediaExtractorUtils;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -47,6 +48,7 @@ public class MediaTranscoderEngine {
     private volatile double mProgress;
     private ProgressCallback mProgressCallback;
     private long mDurationUs;
+    private List<OutputSegment> mSegments = new ArrayList<OutputSegment>();
 
     /**
      * Do not use this constructor unless you know what you are doing.
@@ -59,8 +61,8 @@ public class MediaTranscoderEngine {
     public void setDataSource(FileDescriptor fileDescriptor) {
         setDataSource(fileDescriptor, "default");
     }
-    public void setDataSource(FileDescriptor fileDescriptor, String name) {
-        mInputFileDescriptor.put(name, fileDescriptor);
+    public void setDataSource(FileDescriptor fileDescriptor, String channelName) {
+        mInputFileDescriptor.put(channelName, fileDescriptor);
     }
 
     public ProgressCallback getProgressCallback() {
@@ -89,6 +91,9 @@ public class MediaTranscoderEngine {
      * @throws InterruptedException         when cancel to transcode.
      */
     public void transcodeVideo(String outputPath, MediaFormatStrategy formatStrategy) throws IOException, InterruptedException {
+        if (mSegments.size() < 1) {
+            mSegments.add(OutputSegment.create().addChannel("default"));
+        }
         if (outputPath == null) {
             throw new NullPointerException("Output path cannot be null.");
         }
@@ -193,14 +198,15 @@ public class MediaTranscoderEngine {
         } else {
             mVideoTrackTranscoder = new VideoTrackTranscoder(mExtractor, videoOutputFormat, queuedMuxer);
         }
-        mVideoTrackTranscoder.setup();
+        mVideoTrackTranscoder.setupEncoder();
+
         if (audioOutputFormat == null) {
             mAudioTrackTranscoder = new PassThroughTrackTranscoder(mExtractor.entrySet().iterator().next().getValue(), trackResult.mAudioTrackIndex, queuedMuxer, QueuedMuxer.SampleType.AUDIO);
         } else {
             mAudioTrackTranscoder = new AudioTrackTranscoder(mExtractor,  audioOutputFormat, queuedMuxer);
         }
-        mAudioTrackTranscoder.setup();
-        }
+        mAudioTrackTranscoder.setupEncoder();
+    }
 
     private void runPipelines() {
         long loopCount = 0;
@@ -209,24 +215,30 @@ public class MediaTranscoderEngine {
             mProgress = progress;
             if (mProgressCallback != null) mProgressCallback.onProgress(progress); // unknown
         }
-        while (!(mVideoTrackTranscoder.isFinished() && mAudioTrackTranscoder.isFinished())) {
-            boolean stepped = mVideoTrackTranscoder.stepPipeline()
-                    || mAudioTrackTranscoder.stepPipeline();
-            loopCount++;
-            if (mDurationUs > 0 && loopCount % PROGRESS_INTERVAL_STEPS == 0) {
-                double videoProgress = mVideoTrackTranscoder.isFinished() ? 1.0 : Math.min(1.0, (double) mVideoTrackTranscoder.getWrittenPresentationTimeUs() / mDurationUs);
-                double audioProgress = mAudioTrackTranscoder.isFinished() ? 1.0 : Math.min(1.0, (double) mAudioTrackTranscoder.getWrittenPresentationTimeUs() / mDurationUs);
-                double progress = (videoProgress + audioProgress) / 2.0;
-                mProgress = progress;
-                if (mProgressCallback != null) mProgressCallback.onProgress(progress);
-            }
-            if (!stepped) {
-                try {
-                    Thread.sleep(SLEEP_TO_WAIT_TRACK_TRANSCODERS);
-                } catch (InterruptedException e) {
-                    // nothing to do
+        for (OutputSegment segment : mSegments) {
+            mAudioTrackTranscoder.setupDecoder(segment);
+            mVideoTrackTranscoder.setupDecoder(segment);
+            while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
+                boolean stepped = mVideoTrackTranscoder.stepPipeline(segment)
+                        || mAudioTrackTranscoder.stepPipeline(segment);
+                loopCount++;
+                if (mDurationUs > 0 && loopCount % PROGRESS_INTERVAL_STEPS == 0) {
+                    double videoProgress = mVideoTrackTranscoder.isSegmentFinished() ? 1.0 : Math.min(1.0, (double) mVideoTrackTranscoder.getWrittenPresentationTimeUs() / mDurationUs);
+                    double audioProgress = mAudioTrackTranscoder.isSegmentFinished() ? 1.0 : Math.min(1.0, (double) mAudioTrackTranscoder.getWrittenPresentationTimeUs() / mDurationUs);
+                    double progress = (videoProgress + audioProgress) / 2.0;
+                    mProgress = progress;
+                    if (mProgressCallback != null) mProgressCallback.onProgress(progress);
+                }
+                if (!stepped) {
+                    try {
+                        Thread.sleep(SLEEP_TO_WAIT_TRACK_TRANSCODERS);
+                    } catch (InterruptedException e) {
+                        // nothing to do
+                    }
                 }
             }
+            mVideoTrackTranscoder.releaseDecoder(segment);
+            mAudioTrackTranscoder.releaseDecoder(segment);
         }
     }
 

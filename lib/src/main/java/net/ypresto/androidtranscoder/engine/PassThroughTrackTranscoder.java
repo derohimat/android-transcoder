@@ -90,7 +90,7 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
     }
 
     @Override
-    public boolean isFinished() {
+    public boolean isSegmentFinished() {
         return mIsEOS;
     }
 

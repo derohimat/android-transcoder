@@ -220,7 +220,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     }
 
     @Override
-    public boolean isFinished() {
+    public boolean isSegmentFinished() {
         return mIsEncoderEOS;
     }
 

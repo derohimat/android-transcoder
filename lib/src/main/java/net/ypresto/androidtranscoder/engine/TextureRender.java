@@ -65,11 +65,13 @@ class TextureRender {
     private float[] mMVPMatrix = new float[16];
     private float[] mSTMatrix = new float[16];
     private int mProgram;
-    private int mTextureID = -12345;
     private int muMVPMatrixHandle;
     private int muSTMatrixHandle;
     private int maPositionHandle;
     private int maTextureHandle;
+    private SurfaceTexture mSurfaceTexture1;
+    private SurfaceTexture mSurfaceTexture2;
+
     public TextureRender() {
         mTriangleVertices = ByteBuffer.allocateDirect(
                 mTriangleVerticesData.length * FLOAT_SIZE_BYTES)
@@ -77,10 +79,12 @@ class TextureRender {
         mTriangleVertices.put(mTriangleVerticesData).position(0);
         Matrix.setIdentityM(mSTMatrix, 0);
     }
-    public int getTextureId() {
-        return mTextureID;
-    }
-    public void drawFrame(SurfaceTexture st) {
+
+    public void drawFrame() {
+
+        SurfaceTexture st = mSurfaceTexture1;
+        int textureID = st.getTextureId();
+
         checkGlError("onDrawFrame start");
         st.getTransformMatrix(mSTMatrix);
         GLES20.glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
@@ -88,7 +92,7 @@ class TextureRender {
         GLES20.glUseProgram(mProgram);
         checkGlError("glUseProgram");
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mTextureID);
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureID);
         mTriangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET);
         GLES20.glVertexAttribPointer(maPositionHandle, 3, GLES20.GL_FLOAT, false,
                 TRIANGLE_VERTICES_DATA_STRIDE_BYTES, mTriangleVertices);
@@ -111,7 +115,7 @@ class TextureRender {
     /**
      * Initializes GL state.  Call this after the EGL surface has been created and made current.
      */
-    public void surfaceCreated() {
+    public void surfaceCreated(Integer inTexture1, Integer inTexture2, Integer outTexture) {
         mProgram = createProgram(VERTEX_SHADER, FRAGMENT_SHADER);
         if (mProgram == 0) {
             throw new RuntimeException("failed creating program");
@@ -136,11 +140,8 @@ class TextureRender {
         if (muSTMatrixHandle == -1) {
             throw new RuntimeException("Could not get attrib location for uSTMatrix");
         }
-        int[] textures = new int[1];
-        GLES20.glGenTextures(1, textures, 0);
-        mTextureID = textures[0];
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mTextureID);
-        checkGlError("glBindTexture mTextureID");
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, inTexture1);
+        checkGlError("glBindTexture inTexture1");
         GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER,
                 GLES20.GL_LINEAR);
         GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER,
@@ -151,12 +152,7 @@ class TextureRender {
                 GLES20.GL_CLAMP_TO_EDGE);
         checkGlError("glTexParameter");
     }
-    /**
-     * Replaces the fragment shader.
-     */
-    public void changeFragmentShader(String fragmentShader) {
-        throw new UnsupportedOperationException("Not implemented");
-    }
+
     private int loadShader(int shaderType, String source) {
         int shader = GLES20.glCreateShader(shaderType);
         checkGlError("glCreateShader type=" + shaderType);

@@ -15,7 +15,6 @@
  */
 package net.ypresto.androidtranscoder.engine;
 
-import android.icu.util.Output;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
@@ -74,7 +73,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                 mDecoder.configure(inputFormat, mDecoderOutputSurfaceWrapper.getSurface(), null, 0);
                 mDecoder.start();
                 mDecoderStarted = true;
-                mDecoderInputBuffers = decoder.getInputBuffers());
+                mDecoderInputBuffers = decoder.getInputBuffers();
             }
         }
 
@@ -138,7 +137,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
     @Override
     public void setupDecoder(OutputSegment outputSegment) {
-        for (Map.Entry<String, OutputSegment.VideoChannel> entry : outputSegment.getChannels().entrySet()) {
+        for (Map.Entry<String, OutputSegment.Channel> entry : outputSegment.getChannels().entrySet()) {
             DecoderWrapper encoder = mDecoderWrappers.get(entry.getKey());
             if (!encoder.mDecoderStarted) {
                 encoder.start();
@@ -202,8 +201,8 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     }
     @Override
     public void releaseDecoder(OutputSegment outputSegment) {
-        for (Map.Entry<String, OutputSegment.VideoChannel> entry : outputSegment.getChannels().entrySet()) {
-            OutputSegment.VideoChannel channel = entry.getValue();
+        for (Map.Entry<String, OutputSegment.Channel> entry : outputSegment.getChannels().entrySet()) {
+            OutputSegment.Channel channel = entry.getValue();
             DecoderWrapper encoder = mDecoderWrappers.get(entry.getKey());
             if (!encoder.mIsDecoderEOS) {
                 encoder.release();
@@ -220,7 +219,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private int drainExtractors(OutputSegment outputSegment, long timeoutUs) {
         boolean sampleProcessed = false;
 
-        for (Map.Entry<String, OutputSegment.VideoChannel> entry : outputSegment.getChannels().entrySet()) {
+        for (Map.Entry<String, OutputSegment.Channel> entry : outputSegment.getChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(entry.getKey());
             if (!decoderWrapper.mIsExtractorEOS) {
 
@@ -264,7 +263,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         int textureCount = 0;
 
         // Go through each decoder in the segment and get it's frame into a texture
-        for (Map.Entry<String, OutputSegment.VideoChannel> entry : outputSegment.getChannels().entrySet()) {
+        for (Map.Entry<String, OutputSegment.Channel> entry : outputSegment.getChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(entry.getKey());
             if (!decoderWrapper.mIsExtractorEOS) {
                 if (!decoderWrapper.mDecoderOutputSurfaceWrapper.hasTexture() &&

@@ -3,7 +3,6 @@ package net.ypresto.androidtranscoder.engine;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Represents the wiring for a time sequence in terms of input channels, output channels and filters
@@ -11,7 +10,11 @@ import java.util.Set;
  */
 public class OutputSegment {
 
-     public class VideoPatch {
+    /**
+     * Represents a mapping of one or two input channels to an output channel, optionally
+     * applying a filter.
+     */
+    public class VideoPatch {
         public String mInput1;
         public String mInput2;
         public String mOutput;
@@ -23,17 +26,22 @@ public class OutputSegment {
             mFilter = filter;
         }
     }
+
     enum Filter {CHROMA_KEY, CROSS_FADE, SEPIA}; // Temporary until we implement filters
-    public class VideoChannel {
+
+    /**
+     *
+     */
+    public class Channel {
         public long mInputStartTime;
-        VideoChannel (long inputStartTime) {
+        Channel(long inputStartTime) {
             mInputStartTime = inputStartTime;
         }
     }
     private long mDurationUs = 0; // 0 means until end of stream
     private boolean mIsLast = false;
     private List<VideoPatch> mVideoPatches = new ArrayList<VideoPatch>();
-    private HashMap<String, VideoChannel> mChannels = new HashMap<String, VideoChannel>();
+    private HashMap<String, Channel> mVideoChannels = new HashMap<String, Channel>();
 
     OutputSegment () {
     }
@@ -56,8 +64,8 @@ public class OutputSegment {
      * @param inputChannel
      * @param inputStartTime
      */
-    OutputSegment addChannel (String inputChannel, long inputStartTime) {
-        mChannels.put(inputChannel, new VideoChannel(inputStartTime));
+    OutputSegment addVideoChannel(String inputChannel, long inputStartTime) {
+        mVideoChannels.put(inputChannel, new Channel(inputStartTime));
         return this;
     }
 
@@ -65,9 +73,8 @@ public class OutputSegment {
      * Add a video input and assign as a channel
      * @param inputChannel
      */
-    OutputSegment addChannel (String inputChannel) {
-        mChannels.put(inputChannel, 0l);
-        return this;
+    OutputSegment addVideoChannel(String inputChannel) {
+        return this.addVideoChannel(inputChannel, 0l);
     }
 
     /**
@@ -124,8 +131,8 @@ public class OutputSegment {
         return mVideoPatches.size();
     }
 
-    HashMap<String, VideoChannel> getChannels() {
-        return mChannels;
+    HashMap<String, Channel> getChannels() {
+        return mVideoChannels;
     }
 
     List <VideoPatch> getVideoPatches () {

@@ -92,7 +92,7 @@ public class MediaTranscoderEngine {
      */
     public void transcodeVideo(String outputPath, MediaFormatStrategy formatStrategy) throws IOException, InterruptedException {
         if (mSegments.size() < 1) {
-            mSegments.add(OutputSegment.create().addChannel("default"));
+            mSegments.add(OutputSegment.create().addVideoChannel("default"));
         }
         if (outputPath == null) {
             throw new NullPointerException("Output path cannot be null.");

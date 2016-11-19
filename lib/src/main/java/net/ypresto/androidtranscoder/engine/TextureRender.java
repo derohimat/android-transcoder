@@ -69,8 +69,8 @@ class TextureRender {
     private int muSTMatrixHandle;
     private int maPositionHandle;
     private int maTextureHandle;
-    private SurfaceTexture mSurfaceTexture1;
-    private SurfaceTexture mSurfaceTexture2;
+    private OutputSurface mOutputSurface1;
+    private OutputSurface mOutputSurface2;
 
     public TextureRender() {
         mTriangleVertices = ByteBuffer.allocateDirect(
@@ -82,8 +82,9 @@ class TextureRender {
 
     public void drawFrame() {
 
-        SurfaceTexture st = mSurfaceTexture1;
-        int textureID = st.getTextureId();
+
+        int textureID = mOutputSurface1.getTextureID();
+        SurfaceTexture st = mOutputSurface1.getSurfaceTexture();
 
         checkGlError("onDrawFrame start");
         st.getTransformMatrix(mSTMatrix);
@@ -111,11 +112,15 @@ class TextureRender {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
         checkGlError("glDrawArrays");
         GLES20.glFinish();
+
+        mOutputSurface1.frameDrawn();
     }
     /**
      * Initializes GL state.  Call this after the EGL surface has been created and made current.
      */
-    public void surfaceCreated(OutputSurface decoderOutputSurface1, OutputSurface decoderOutputSurface2, Integer outTexture) {
+    public void surfaceCreated(OutputSurface outputSurface1, OutputSurface outputSurface2, Integer outTexture) {
+        mOutputSurface1 = outputSurface1;
+        mOutputSurface2 = outputSurface2;
         mProgram = createProgram(VERTEX_SHADER, FRAGMENT_SHADER);
         if (mProgram == 0) {
             throw new RuntimeException("failed creating program");
@@ -140,7 +145,7 @@ class TextureRender {
         if (muSTMatrixHandle == -1) {
             throw new RuntimeException("Could not get attrib location for uSTMatrix");
         }
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, decoderOutputSurface1.getTextureID());
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, outputSurface1.getTextureID());
         checkGlError("glBindTexture inTexture1");
         GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER,
                 GLES20.GL_LINEAR);

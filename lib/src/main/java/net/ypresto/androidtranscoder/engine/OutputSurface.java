@@ -55,7 +55,6 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private Object mFrameSyncObject = new Object();     // guards mFrameAvailable
     private boolean mFrameAvailable;
     private boolean mTextureReady = false;
-    private boolean mEOS;
     private int mTextureID = -12345;
     /**
      * Creates an OutputSurface backed by a pbuffer with the specifed dimensions.  The new
@@ -110,6 +109,9 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     }
     public int getTextureID () {
         return mTextureID;
+    }
+    SurfaceTexture getSurfaceTexture () {
+        return mSurfaceTexture;
     }
     /**
      * Prepares EGL.  We want a GLES 2.0 context and a surface that supports pbuffer.
@@ -230,11 +232,7 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         mSurfaceTexture.updateTexImage();
         mTextureReady = true;
     }
-    /**
-     * Draws the data from SurfaceTexture onto the current EGL surface.
-     */
-    public void drawImage(TextureRender textureRender) {
-        textureRender.drawFrame(mSurfaceTexture);
+    public void frameDrawn() {
         mTextureReady = false;
     }
     @Override
@@ -263,11 +261,5 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             Log.e(TAG, op + ": glError " + error);
             throw new RuntimeException(op + ": glError " + error);
         }
-    }
-    public boolean isEndOfInputStream() {
-        return mEOS;
-    }
-    public void signalEndOfInputStream () {
-        mEOS = true;
     }
 }

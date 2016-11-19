@@ -15,12 +15,13 @@
  */
 package net.ypresto.androidtranscoder.engine;
 
+import android.media.MediaExtractor;
 import android.media.MediaFormat;
 
 public interface TrackTranscoder {
 
     void setupEncoder();
-    void setupDecoder(OutputSegment outputSegment);
+    void setupDecoder(OutputSegment.InputStream inputStream, MediaExtractor extractor);
 
     /**
      * Get actual MediaFormat which is used to write to muxer.
@@ -45,8 +46,10 @@ public interface TrackTranscoder {
      */
     long getWrittenPresentationTimeUs();
 
-    boolean isSegmentFinished();
+    abstract boolean isSegmentFinished();
 
     void releaseDecoder(OutputSegment outputSegment);
     void releaseEncoder();
-}
+    public void setupTexture(OutputSegment outputSegment);
+
+    }

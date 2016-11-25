@@ -3,13 +3,16 @@ package net.ypresto.androidtranscoder.engine;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Represents the wiring for a time sequence in terms of input channels, output channels and filters
  *
  */
 public class OutputSegment {
+
+     private static List<OutputSegment> mSegments = new ArrayList<OutputSegment>();
+
+     public static List<OutputSegment> getList() { return mSegments;}
 
      public class VideoPatch {
         public String mInput1;
@@ -30,25 +33,36 @@ public class OutputSegment {
             mInputStartTime = inputStartTime;
         }
     }
+    private long mStartTimeUs = 0;
+    private long mNextSegmentStartTimeUs = 0;
     private long mDurationUs = 0; // 0 means until end of stream
+    private long mIndex = 0;
     private boolean mIsLast = false;
     private List<VideoPatch> mVideoPatches = new ArrayList<VideoPatch>();
     private HashMap<String, VideoChannel> mChannels = new HashMap<String, VideoChannel>();
 
-    OutputSegment () {
-    }
-    static OutputSegment create () {
-        return new OutputSegment();
+    private OutputSegment (long startTimeUs, long durationUs) {
+        mDurationUs = durationUs;
+        mStartTimeUs = startTimeUs;
+        mNextSegmentStartTimeUs = mStartTimeUs + mDurationUs;
+        mIndex = mSegments.size();
+        mSegments.add(this);
     }
 
-    /**
-     * Set the duration of teh segment or else it runs until end of stream on any channel
-     * @param durationUs
-     * @return
-     */
-    OutputSegment duration(long durationUs) {
-        mDurationUs = durationUs;
-        return this;
+    static OutputSegment create () { return create(0l); }
+    static OutputSegment create (long durationUs)
+    {
+        Long startTimeUs = mSegments.size() == 0 ? 0 : mSegments.get(mSegments.size() - 2).mNextSegmentStartTimeUs;
+        if (mSegments.size() > 0 && startTimeUs == 0)
+            throw new IllegalStateException("Only the last segment can have a zero duration");
+        return new OutputSegment(startTimeUs, durationUs);
+    }
+
+    public long getNextSegmentStartTime () {
+        if (mDurationUs == 0)
+            return Long.MAX_VALUE;
+        else
+            return mNextSegmentStartTimeUs;
     }
 
     /**
@@ -66,8 +80,7 @@ public class OutputSegment {
      * @param inputChannel
      */
     OutputSegment addChannel (String inputChannel) {
-        mChannels.put(inputChannel, 0l);
-        return this;
+        return addChannel(inputChannel, 0l);
     }
 
     /**
@@ -125,6 +138,17 @@ public class OutputSegment {
     }
 
     HashMap<String, VideoChannel> getChannels() {
+        return mChannels;
+    }
+
+    /**
+     * Get a list of channels to open for this segment
+     * @return
+     */
+    HashMap<String, VideoChannel> getChannelsToOpen() {
+        return mChannels;
+    }
+    HashMap<String, VideoChannel> getChannelsToClose() {
         return mChannels;
     }
 

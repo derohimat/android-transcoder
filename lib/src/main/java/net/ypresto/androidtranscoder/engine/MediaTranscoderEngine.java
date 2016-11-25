@@ -48,7 +48,7 @@ public class MediaTranscoderEngine {
     private volatile double mProgress;
     private ProgressCallback mProgressCallback;
     private long mDurationUs;
-    private List<OutputSegment> mSegments = new ArrayList<OutputSegment>();
+
 
     /**
      * Do not use this constructor unless you know what you are doing.
@@ -91,9 +91,7 @@ public class MediaTranscoderEngine {
      * @throws InterruptedException         when cancel to transcode.
      */
     public void transcodeVideo(String outputPath, MediaFormatStrategy formatStrategy) throws IOException, InterruptedException {
-        if (mSegments.size() < 1) {
-            mSegments.add(OutputSegment.create().addChannel("default"));
-        }
+        OutputSegment.create().addChannel("default");
         if (outputPath == null) {
             throw new NullPointerException("Output path cannot be null.");
         }
@@ -215,7 +213,7 @@ public class MediaTranscoderEngine {
             mProgress = progress;
             if (mProgressCallback != null) mProgressCallback.onProgress(progress); // unknown
         }
-        for (OutputSegment segment : mSegments) {
+        for (OutputSegment segment : OutputSegment.getList()) {
             mAudioTrackTranscoder.setupDecoder(segment);
             mVideoTrackTranscoder.setupDecoder(segment);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {

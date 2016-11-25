@@ -27,8 +27,6 @@ import android.opengl.GLES20;
 import android.util.Log;
 import android.view.Surface;
 
-import java.nio.IntBuffer;
-
 /**
  * Holds state associated with a Surface used for MediaCodec decoder output.
  * <p>
@@ -55,7 +53,7 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private Object mFrameSyncObject = new Object();     // guards mFrameAvailable
     private boolean mFrameAvailable;
     private boolean mTextureReady = false;
-    private boolean mEOS;
+    private boolean mEndOfStream;
     private int mTextureID = -12345;
     /**
      * Creates an OutputSurface backed by a pbuffer with the specifed dimensions.  The new
@@ -111,6 +109,7 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     public int getTextureID () {
         return mTextureID;
     }
+    public SurfaceTexture getmSurfaceTexture () { return mSurfaceTexture; }
     /**
      * Prepares EGL.  We want a GLES 2.0 context and a surface that supports pbuffer.
      */
@@ -198,9 +197,11 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     public Surface getSurface() {
         return mSurface;
     }
-    public boolean hasTexture () {
+    public boolean isTextureReady() {
         return mTextureReady;
     }
+    public void setTextureReady() { mTextureReady = true;}
+    public void clearTextureReady() { mTextureReady = false;}
     /**
      * Latches the next buffer into the texture.  Must be called from the thread that created
      * the OutputSurface object, after the onFrameAvailable callback has signaled that new
@@ -230,13 +231,7 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         mSurfaceTexture.updateTexImage();
         mTextureReady = true;
     }
-    /**
-     * Draws the data from SurfaceTexture onto the current EGL surface.
-     */
-    public void drawImage(TextureRender textureRender) {
-        textureRender.drawFrame(mSurfaceTexture);
-        mTextureReady = false;
-    }
+
     @Override
     public void onFrameAvailable(SurfaceTexture st) {
         if (VERBOSE) Log.d(TAG, "new frame available");
@@ -265,9 +260,9 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         }
     }
     public boolean isEndOfInputStream() {
-        return mEOS;
+        return mEndOfStream;
     }
     public void signalEndOfInputStream () {
-        mEOS = true;
+        mEndOfStream = true;
     }
 }

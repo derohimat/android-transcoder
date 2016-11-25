@@ -49,4 +49,5 @@ public interface TrackTranscoder {
 
     void releaseDecoder(OutputSegment outputSegment);
     void releaseEncoder();
+    void release();
 }

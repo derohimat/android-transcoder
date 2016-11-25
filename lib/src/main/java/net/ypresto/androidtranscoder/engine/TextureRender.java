@@ -69,10 +69,12 @@ class TextureRender {
     private int muSTMatrixHandle;
     private int maPositionHandle;
     private int maTextureHandle;
-    private SurfaceTexture mSurfaceTexture1;
-    private SurfaceTexture mSurfaceTexture2;
+    private OutputSurface mOutputSurface1;
+    private OutputSurface mOutputSurface2;
 
-    public TextureRender() {
+    public TextureRender(OutputSurface outputSurface1, OutputSurface outputSurface2) {
+        mOutputSurface1 = outputSurface1;
+        mOutputSurface2 = outputSurface2;
         mTriangleVertices = ByteBuffer.allocateDirect(
                 mTriangleVerticesData.length * FLOAT_SIZE_BYTES)
                 .order(ByteOrder.nativeOrder()).asFloatBuffer();
@@ -82,11 +84,10 @@ class TextureRender {
 
     public void drawFrame() {
 
-        SurfaceTexture st = mSurfaceTexture1;
-        int textureID = st.getTextureId();
+        int textureID = mOutputSurface1.getTextureID();
 
         checkGlError("onDrawFrame start");
-        st.getTransformMatrix(mSTMatrix);
+        mOutputSurface1.getmSurfaceTexture().getTransformMatrix(mSTMatrix);
         GLES20.glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
         GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
         GLES20.glUseProgram(mProgram);
@@ -111,11 +112,15 @@ class TextureRender {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
         checkGlError("glDrawArrays");
         GLES20.glFinish();
+
+        mOutputSurface1.clearTextureReady();
+        if(mOutputSurface2 != null)
+            mOutputSurface2.clearTextureReady();
     }
     /**
      * Initializes GL state.  Call this after the EGL surface has been created and made current.
      */
-    public void surfaceCreated(Integer inTexture1, Integer inTexture2, Integer outTexture) {
+    public void surfaceCreated() {
         mProgram = createProgram(VERTEX_SHADER, FRAGMENT_SHADER);
         if (mProgram == 0) {
             throw new RuntimeException("failed creating program");
@@ -140,7 +145,7 @@ class TextureRender {
         if (muSTMatrixHandle == -1) {
             throw new RuntimeException("Could not get attrib location for uSTMatrix");
         }
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, inTexture1);
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mOutputSurface1.getTextureID());
         checkGlError("glBindTexture inTexture1");
         GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER,
                 GLES20.GL_LINEAR);

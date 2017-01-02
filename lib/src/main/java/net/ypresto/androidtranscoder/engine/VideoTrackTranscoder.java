@@ -114,11 +114,6 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                                 MediaFormat outputFormat, QueuedMuxer muxer) {
         mOutputFormat = outputFormat;
         mMuxer = muxer;
-
-        // Create Encoder wrapper with an extractor only at this point.  The rest gets setup on each segment
-        for (Map.Entry<String, MediaExtractor> entry : extractors.entrySet()) {
-            mDecoderWrappers.put(entry.getKey(), new DecoderWrapper(entry.getValue()));
-        }
     }
 
     @Override
@@ -231,8 +226,8 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private int drainExtractors(OutputSegment outputSegment, long timeoutUs) {
         boolean sampleProcessed = false;
 
-        for (Map.Entry<String, OutputSegment.VideoChannel> entry : outputSegment.getChannels().entrySet()) {
-            DecoderWrapper decoderWrapper = mDecoderWrappers.get(entry.getKey());
+        for (Map.Entry<String, OutputSegment.InputStream> inputStream : outputSegment.getVideoInputStreams().entrySet()) {
+            DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputStream.getKey());
             if (!decoderWrapper.mIsExtractorEOS) {
 
                 // Find out which track the extractor has samples for next
@@ -280,7 +275,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         boolean stillStreaming = false;
 
         // Go through each decoder in the segment and get it's frame into a texture
-        for (Map.Entry<String, OutputSegment.VideoChannel> entry : outputSegment.getChannels().entrySet()) {
+        for (Map.Entry<String, OutputSegment.InputChannel> entry : outputSegment.getChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(entry.getKey());
             if (!decoderWrapper.mIsExtractorEOS && !decoderWrapper.mIsDecoderEOS) {
                 if (!decoderWrapper.mOutputSurface.isTextureReady() &&
@@ -329,6 +324,35 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
         return consumed ? DRAIN_STATE_CONSUMED : DRAIN_STATE_NONE;
     }
+    /*
+    private int drainDecoderOld(long timeoutUs) {
+        if (mIsDecoderEOS) return DRAIN_STATE_NONE;
+        int result = mDecoder.dequeueOutputBuffer(mBufferInfo, timeoutUs);
+        switch (result) {
+            case MediaCodec.INFO_TRY_AGAIN_LATER:
+                return DRAIN_STATE_NONE;
+            case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
+            case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
+                return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
+        }
+        if ((mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+            mEncoder.signalEndOfInputStream();
+            mIsDecoderEOS = true;
+            mBufferInfo.size = 0;
+        }
+        boolean doRender = (mBufferInfo.size > 0);
+        // NOTE: doRender will block if buffer (of encoder) is full.
+        // Refer: http://bigflake.com/mediacodec/CameraToMpegTest.java.txt
+        mDecoder.releaseOutputBuffer(result, doRender);
+        if (doRender) {
+            mDecoderOutputSurfaceWrapper.awaitNewImage();
+            mDecoderOutputSurfaceWrapper.drawImage();
+            mEncoderInputSurfaceWrapper.setPresentationTime(mBufferInfo.presentationTimeUs * 1000);
+            mEncoderInputSurfaceWrapper.swapBuffers();
+        }
+        return DRAIN_STATE_CONSUMED;
+    }
+    */
 
     private int drainEncoder(long timeoutUs) {
         if (mIsEncoderEOS) return DRAIN_STATE_NONE;

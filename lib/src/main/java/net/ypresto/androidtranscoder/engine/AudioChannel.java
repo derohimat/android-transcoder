@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Queue;
 
 /**
- * Channel of raw audio from decoder to encoder.
+ * InputChannel of raw audio from decoder to encoder.
  * Performs the necessary conversion between different input & output audio formats.
  *
  * We currently support upmixing from mono to stereo & downmixing from stereo to mono.

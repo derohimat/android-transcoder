@@ -109,7 +109,9 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     public int getTextureID () {
         return mTextureID;
     }
-    public SurfaceTexture getmSurfaceTexture () { return mSurfaceTexture; }
+    SurfaceTexture getSurfaceTexture () {
+        return mSurfaceTexture;
+    }
     /**
      * Prepares EGL.  We want a GLES 2.0 context and a surface that supports pbuffer.
      */

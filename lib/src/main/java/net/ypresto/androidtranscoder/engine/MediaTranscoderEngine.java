@@ -26,9 +26,7 @@ import net.ypresto.androidtranscoder.utils.MediaExtractorUtils;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -48,7 +46,6 @@ public class MediaTranscoderEngine {
     private volatile double mProgress;
     private ProgressCallback mProgressCallback;
     private long mDurationUs;
-
 
     /**
      * Do not use this constructor unless you know what you are doing.
@@ -84,15 +81,14 @@ public class MediaTranscoderEngine {
      * Run video transcoding. Blocks current thread.
      * Audio data will not be transcoded; original stream will be wrote to output file.
      *
-     * @param segments                      List of individual patches
      * @param outputPath                    File path to output transcoded video file.
      * @param formatStrategy                Output format strategy.
      * @throws IOException                  when input or output file could not be opened.
      * @throws InvalidOutputFormatException when output format is not supported.
      * @throws InterruptedException         when cancel to transcode.
      */
-    public void transcodeVideo(ArrayList<OutputSegment> segments, String outputPath, MediaFormatStrategy formatStrategy) throws IOException, InterruptedException {
-        mSegments = segments;
+    public void transcodeVideo(String outputPath, MediaFormatStrategy formatStrategy) throws IOException, InterruptedException {
+
         if (outputPath == null) {
             throw new NullPointerException("Output path cannot be null.");
         }
@@ -102,7 +98,7 @@ public class MediaTranscoderEngine {
         try {
              mMuxer = new MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             setupMetadata();
-            setupTrackTranscoders(segments, formatStrategy);
+            setupTrackTranscoders(formatStrategy);
             runPipelines();
             mMuxer.stop();
         } finally {
@@ -156,32 +152,6 @@ public class MediaTranscoderEngine {
         }
         Log.d(TAG, "Duration (us): " + mDurationUs);
     }
-    private void createExtractors(OutputSegment outputSegment) throws IOException {
-        for (Map.Entry<String, OutputSegment.InputStream> inputStream : outputSegment.getVideoInputStreams().entrySet()) {
-            if (mExtractor.get(inputStream.getKey()) != null && inputStream.getValue().mOpen) {
-                FileDescriptor fileDescriptor = inputStream.getValue().mInputFileDescriptor;
-                MediaExtractor mediaExtractor = new MediaExtractor();
-                try {
-                    mediaExtractor.setDataSource(fileDescriptor);
-                } catch (IOException e) {
-                    Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
-                    throw e;
-                }
-                MediaExtractorUtils.TrackResult trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(mediaExtractor);
-                if (trackResult.mVideoTrackFormat != null) {
-                    mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
-                    mExtractor.put(inputStream.getValue().mChannel, mediaExtractor);
-                    mVideoTrackTranscoder.setupDecoder(inputStream.getValue(), mediaExtractor);
-                }
-                if (trackResult.mAudioTrackFormat != null) {
-                    mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
-                    mExtractor.put(inputStream.getValue().mChannel, mediaExtractor);
-                    mAudioTrackTranscoder.setupDecoder(inputStream.getValue(), mediaExtractor);
-                }
-            }
-        }
-
-    }
 
     /**
      * Setup MediaExtractors for ever possible case in each output segment but defer connecting
@@ -189,41 +159,39 @@ public class MediaTranscoderEngine {
      * how many decoders can run at the same time and this reduced to absolute minimum needed.
      *
      * Invoke the extractor to get track information which will be used to determine high level
-     * output output format details. Setup a queuedMuxer which delays MUXing until the decoder has
+     * output output format details. Setup a queuedMuxer which delays Muxing until the decoder has
      * enough information to call it's setOutputFormat method and set the detailed output format.
      *
-     * @param segments
+
      * @param formatStrategy
      * @throws IOException
      */
-    private void setupTrackTranscoders(ArrayList<OutputSegment> segments, MediaFormatStrategy formatStrategy) throws IOException {
+    private void setupTrackTranscoders(MediaFormatStrategy formatStrategy) throws IOException {
 
-        // Find the first vidoe and audio track to establish an interim output format
+        // Setup all extractors for all segments, finding the first video and audio track to establish an interim output format
         MediaFormat videoOutputFormat = null;
         MediaFormat audioOutputFormat = null;
         MediaExtractorUtils.TrackResult trackResult = null;
-        for (OutputSegment outputSegment : segments) {
-            for (Map.Entry<String, OutputSegment.InputChannel> inputChannelEntry : outputSegment.getChannels().entrySet()) {
-                if (videoOutputFormat != null || audioOutputFormat != null) {
-                    FileDescriptor fileDescriptor = inputChannelEntry.getValue().mInputFileDescriptor;
-                    MediaExtractor mediaExtractor = new MediaExtractor();
-                    try {
-                    mediaExtractor.setDataSource(fileDescriptor);
-                    } catch (IOException e) {
-                        Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
-                        throw e;
-                    }
-                    trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(mediaExtractor);
-                    if (videoOutputFormat == null && trackResult.mVideoTrackFormat != null) {
-                        videoOutputFormat = formatStrategy.createVideoOutputFormat(trackResult.mVideoTrackFormat);
-                        mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
-                        mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
-                    }
-                    if (audioOutputFormat == null && trackResult.mAudioTrackFormat != null) {
-                        audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat);
-                        mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
-                        mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
-                    }
+        for (Map.Entry<String, OutputSegments.InputChannel> inputChannelEntry : OutputSegments.getInstance().getChannels().entrySet()) {
+            if (videoOutputFormat != null || audioOutputFormat != null) {
+                FileDescriptor fileDescriptor = inputChannelEntry.getValue().mInputFileDescriptor;
+                MediaExtractor mediaExtractor = new MediaExtractor();
+                try {
+                mediaExtractor.setDataSource(fileDescriptor);
+                } catch (IOException e) {
+                    Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
+                    throw e;
+                }
+                trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(mediaExtractor);
+                if (videoOutputFormat == null && trackResult.mVideoTrackFormat != null) {
+                    videoOutputFormat = formatStrategy.createVideoOutputFormat(trackResult.mVideoTrackFormat);
+                    mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
+                    mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
+                }
+                if (audioOutputFormat == null && trackResult.mAudioTrackFormat != null) {
+                    audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat);
+                    mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
+                    mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
                 }
             }
         }
@@ -262,12 +230,9 @@ public class MediaTranscoderEngine {
             mProgress = progress;
             if (mProgressCallback != null) mProgressCallback.onProgress(progress); // unknown
         }
-        for (OutputSegment outputSegment : mSegments) {
-            createExtractors(outputSegment);
-            mVideoTrackTranscoder.setupTexture(outputSegment);
-        for (OutputSegment segment : OutputSegment.getList()) {
-            mAudioTrackTranscoder.setupDecoder(segment);
-            mVideoTrackTranscoder.setupDecoder(segment);
+        for (OutputSegments.Segment outputSegment : OutputSegments.getInstance().getSegments()) {
+            mAudioTrackTranscoder.setupDecoder(outputSegment, mExtractor);
+            mVideoTrackTranscoder.setupDecoder(outputSegment, mExtractor);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
                 boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment)
                         || mAudioTrackTranscoder.stepPipeline(outputSegment);
@@ -287,7 +252,7 @@ public class MediaTranscoderEngine {
                     }
                 }
             }
-            releaseExtractors(outputSegment);
+
             mVideoTrackTranscoder.releaseDecoder(outputSegment);
             mAudioTrackTranscoder.releaseDecoder(outputSegment);
         }

@@ -18,10 +18,12 @@ package net.ypresto.androidtranscoder.engine;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 
+import java.util.LinkedHashMap;
+
 public interface TrackTranscoder {
 
     void setupEncoder();
-    void setupDecoder(OutputSegment.InputStream inputStream, MediaExtractor extractor);
+    void setupDecoder(OutputSegments.Segment segment, LinkedHashMap<String, MediaExtractor> extractors);
 
     /**
      * Get actual MediaFormat which is used to write to muxer.
@@ -37,7 +39,7 @@ public interface TrackTranscoder {
      *
      * @return true if data moved in pipeline.
      */
-    boolean stepPipeline(OutputSegment outputSegment);
+    boolean stepPipeline(OutputSegments.Segment segment);
 
     /**
      * Get presentation time of last sample written to muxer.
@@ -48,8 +50,7 @@ public interface TrackTranscoder {
 
     abstract boolean isSegmentFinished();
 
-    void releaseDecoder(OutputSegment outputSegment);
+    void releaseDecoder(OutputSegments.Segment segment);
     void releaseEncoder();
-    public void setupTexture(OutputSegment outputSegment);
     void release();
-    }
+}

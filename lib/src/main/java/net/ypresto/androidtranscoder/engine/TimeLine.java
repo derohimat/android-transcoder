@@ -2,62 +2,42 @@ package net.ypresto.androidtranscoder.engine;
 
 import java.io.FileDescriptor;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 
 /**
  * Represents the wiring for a time sequence in terms of input channels, output channels and filters
  *
- * OutputSegments.getInstance()
+ * TimeLine timeLine = (new TimeLine())
  *      .addChannel("movie1", fd1)
  *      .addChannel("movie2", fd2)
  *      .addChannel("movie3", fd2)
- *
- * OutputSegments.getInstance()
  *      .createSegment()
- *          .duraction("movie1", 60000)
+ *          .duration("movie1", 60000)
  *          .output("movie1", Filter.SEPIA)
- *
- * OutputSegments.getInstance()
- *      .createSegment()
+ *      .timeLine().createSegment()
  *          .duration("movie1", 2000)
  *          .seek("movie2", 1000)
  *          .combineAndPipe("movie1", "movie2", Filter.CROSSFADE, "temp")
  *          .filter("temp", Filter.SEPIA)
- *
- * OutputSegments.getInstance()
- *      .createSegment()
+ *      .timeLine().createSegment()
  *          .trim(2000)
  *          .output("movie2")
- *
- * OutputSegments.getInstance()
- *      .createSegment(1000)
+ *      .timeLine().createSegment(1000)
  *          .combineAndOutput("movie2", "movie3", Filter.CROSSFADE)
- *
- * OutputSegments.getInstance()
- *      .createSegment()
+ *      .timeLine().createSegment()
  *          .output("movie3")
- *
- * OuputSegments.getInstance()
- *      .start()
+ *      .timeLine().start()
  */
-public class OutputSegments {
+public class TimeLine {
 
-    private static OutputSegments instance = null;
     private List<Segment> mSegments = new ArrayList<Segment>();
-    private HashMap<String, InputChannel> mChannels = new HashMap<String, InputChannel>();
+    private LinkedHashMap<String, InputChannel> mChannels = new LinkedHashMap<String, InputChannel>();
+    public TimeLine () {}
 
-    protected OutputSegments() {}
-
-    public static OutputSegments getInstance() {
-        if(instance == null) {
-            instance = new OutputSegments();
-        }
-        return instance;
-
-    }
     public Segment createSegment() {
-        Segment segment = new Segment();
+        Segment segment = new Segment(this);
         mSegments.add(segment);
         return segment;
     }
@@ -74,7 +54,7 @@ public class OutputSegments {
      * Get a List of all channels used for creating the master list of extractors
      * @return
      */
-    public  HashMap<String, InputChannel> getChannels() {return mChannels;}
+    public  LinkedHashMap<String, InputChannel> getChannels() {return mChannels;}
 
 
     /**
@@ -84,25 +64,25 @@ public class OutputSegments {
      * @param inputChannel
      * @return
      */
-    public OutputSegments addChannel(String inputChannel, FileDescriptor inputFileDescriptor) {
+    public TimeLine addChannel(String inputChannel, FileDescriptor inputFileDescriptor) {
         mChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.BOTH));
         return this;
     }
 
     /**
-     * Add a video/auodio and assign as a channel
+     * Add a video/audio and assign as a channel
      *
      * @param inputFileDescriptor
      * @param inputChannel
      * @param channelType
      * @return
      */
-    public OutputSegments addChannel(String inputChannel, FileDescriptor inputFileDescriptor, ChannelType channelType) {
+    public TimeLine addChannel(String inputChannel, FileDescriptor inputFileDescriptor, ChannelType channelType) {
         mChannels.put(inputChannel, new InputChannel(inputFileDescriptor, channelType));
         return this;
     }
 
-    public void start () {
+    public TimeLine start () {
         Segment previousSegment = null;
         for (Segment segment : mSegments) {
             // Add any channels not present in the previous segment to the new channel list
@@ -127,6 +107,7 @@ public class OutputSegments {
                 previousSegment.mFinalChannels.put(inputChannelEntryLast.getKey(), inputChannelEntryLast.getValue());
             }
         }
+        return this;
 
     }
 
@@ -170,7 +151,7 @@ public class OutputSegments {
     }
 
     public class Segment {
-
+        private TimeLine mTimeLine;
         private List<VideoPatch> mVideoPatches = new ArrayList<VideoPatch>();
         private HashMap<String, Long> mSeeks = new HashMap<String, Long>();
         private HashMap<String, Long> mDurations = new HashMap<String, Long>();
@@ -178,6 +159,7 @@ public class OutputSegments {
         private HashMap<String, InputChannel> mFinalChannels = new HashMap<String, InputChannel>();
         private HashMap<String, InputChannel> mActiveChannels = new HashMap<String, InputChannel>();
 
+        public TimeLine timeLine () {return mTimeLine;}
         /**
          * Get all channels for which extractors should be attached at start of segment
          * @return
@@ -221,7 +203,9 @@ public class OutputSegments {
         /**
          * Private constructor - use Segment.create() to create a segment
          */
-        private Segment() {}
+        private Segment(TimeLine timeLine) {
+            mTimeLine = timeLine;
+        }
 
         /**
          * Set the duration of the channel for this segment, otherwise to end of stream
@@ -314,20 +298,6 @@ public class OutputSegments {
         HashMap<String, InputChannel> getVideoChannels() {
             return mChannels;
         }
-
-        /**
-         * Get a list of channels to open for this segment
-         *
-         * @return
-         */
-        HashMap<String, InputChannel> getVideoChannelsToOpen() {
-            return mChannels;
-        }
-
-        HashMap<String, InputChannel> getVideoChannelsToClose() {
-            return mChannels;
-        }
-
 
         List<VideoPatch> getVideoPatches() {
             return mVideoPatches;

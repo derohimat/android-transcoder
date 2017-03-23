@@ -23,7 +23,7 @@ import java.util.LinkedHashMap;
 public interface TrackTranscoder {
 
     void setupEncoder();
-    void setupDecoder(OutputSegments.Segment segment, LinkedHashMap<String, MediaExtractor> extractors);
+    void setupDecoders(TimeLine.Segment segment, LinkedHashMap<String, MediaExtractor> extractors);
 
     /**
      * Get actual MediaFormat which is used to write to muxer.
@@ -39,7 +39,7 @@ public interface TrackTranscoder {
      *
      * @return true if data moved in pipeline.
      */
-    boolean stepPipeline(OutputSegments.Segment segment);
+    boolean stepPipeline(TimeLine.Segment segment);
 
     /**
      * Get presentation time of last sample written to muxer.
@@ -50,7 +50,7 @@ public interface TrackTranscoder {
 
     abstract boolean isSegmentFinished();
 
-    void releaseDecoder(OutputSegments.Segment segment);
+    void releaseDecoders();
     void releaseEncoder();
     void release();
 }

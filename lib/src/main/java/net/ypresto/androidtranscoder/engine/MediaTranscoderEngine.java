@@ -38,7 +38,7 @@ public class MediaTranscoderEngine {
     private static final double PROGRESS_UNKNOWN = -1.0;
     private static final long SLEEP_TO_WAIT_TRACK_TRANSCODERS = 10;
     private static final long PROGRESS_INTERVAL_STEPS = 10;
-    private LinkedHashMap<String, FileDescriptor> mInputFileDescriptor;
+    private FileDescriptor mFirstFileDescriptorWithVideo;
     private TrackTranscoder mVideoTrackTranscoder;
     private TrackTranscoder mAudioTrackTranscoder;
     private LinkedHashMap<String, MediaExtractor> mExtractor;
@@ -51,15 +51,7 @@ public class MediaTranscoderEngine {
      * Do not use this constructor unless you know what you are doing.
      */
     public MediaTranscoderEngine() {
-        mInputFileDescriptor = new LinkedHashMap<String, FileDescriptor>();
         mExtractor = new LinkedHashMap<String, MediaExtractor>();
-    }
-
-    public void setDataSource(FileDescriptor fileDescriptor) {
-        setDataSource(fileDescriptor, "default");
-    }
-    public void setDataSource(FileDescriptor fileDescriptor, String channelName) {
-        mInputFileDescriptor.put(channelName, fileDescriptor);
     }
 
     public ProgressCallback getProgressCallback() {
@@ -81,25 +73,26 @@ public class MediaTranscoderEngine {
      * Run video transcoding. Blocks current thread.
      * Audio data will not be transcoded; original stream will be wrote to output file.
      *
+     * @param timeLine                      Time line of segments
      * @param outputPath                    File path to output transcoded video file.
      * @param formatStrategy                Output format strategy.
      * @throws IOException                  when input or output file could not be opened.
      * @throws InvalidOutputFormatException when output format is not supported.
      * @throws InterruptedException         when cancel to transcode.
      */
-    public void transcodeVideo(String outputPath, MediaFormatStrategy formatStrategy) throws IOException, InterruptedException {
+    public void transcodeVideo(TimeLine timeLine, String outputPath, MediaFormatStrategy formatStrategy) throws IOException, InterruptedException {
 
         if (outputPath == null) {
             throw new NullPointerException("Output path cannot be null.");
         }
-        if (mInputFileDescriptor == null) {
+        if (mFirstFileDescriptorWithVideo == null) {
             throw new IllegalStateException("Data source is not set.");
         }
         try {
              mMuxer = new MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             setupMetadata();
-            setupTrackTranscoders(formatStrategy);
-            runPipelines();
+            setupTrackTranscoders(timeLine, formatStrategy);
+            runPipelines(timeLine);
             mMuxer.stop();
         } finally {
             try {
@@ -132,7 +125,7 @@ public class MediaTranscoderEngine {
 
     private void setupMetadata() throws IOException {
         MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
-        mediaMetadataRetriever.setDataSource(mInputFileDescriptor.entrySet().iterator().next().getValue());
+        mediaMetadataRetriever.setDataSource(mFirstFileDescriptorWithVideo);
 
         String rotationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
         try {
@@ -162,22 +155,22 @@ public class MediaTranscoderEngine {
      * output output format details. Setup a queuedMuxer which delays Muxing until the decoder has
      * enough information to call it's setOutputFormat method and set the detailed output format.
      *
-
+     * @param timeLine
      * @param formatStrategy
      * @throws IOException
      */
-    private void setupTrackTranscoders(MediaFormatStrategy formatStrategy) throws IOException {
+    private void setupTrackTranscoders(TimeLine timeLine, MediaFormatStrategy formatStrategy) throws IOException {
 
         // Setup all extractors for all segments, finding the first video and audio track to establish an interim output format
         MediaFormat videoOutputFormat = null;
         MediaFormat audioOutputFormat = null;
         MediaExtractorUtils.TrackResult trackResult = null;
-        for (Map.Entry<String, OutputSegments.InputChannel> inputChannelEntry : OutputSegments.getInstance().getChannels().entrySet()) {
+        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : timeLine.getChannels().entrySet()) {
             if (videoOutputFormat != null || audioOutputFormat != null) {
                 FileDescriptor fileDescriptor = inputChannelEntry.getValue().mInputFileDescriptor;
                 MediaExtractor mediaExtractor = new MediaExtractor();
                 try {
-                mediaExtractor.setDataSource(fileDescriptor);
+                    mediaExtractor.setDataSource(fileDescriptor);
                 } catch (IOException e) {
                     Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
                     throw e;
@@ -187,6 +180,7 @@ public class MediaTranscoderEngine {
                     videoOutputFormat = formatStrategy.createVideoOutputFormat(trackResult.mVideoTrackFormat);
                     mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
                     mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
+                    mFirstFileDescriptorWithVideo = fileDescriptor;
                 }
                 if (audioOutputFormat == null && trackResult.mAudioTrackFormat != null) {
                     audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat);
@@ -223,19 +217,19 @@ public class MediaTranscoderEngine {
         mAudioTrackTranscoder.setupEncoder();
     }
 
-    private void runPipelines() throws IOException {
+    private void runPipelines(TimeLine timeLine) throws IOException {
         long loopCount = 0;
         if (mDurationUs <= 0) {
             double progress = PROGRESS_UNKNOWN;
             mProgress = progress;
-            if (mProgressCallback != null) mProgressCallback.onProgress(progress); // unknown
+            if (mProgressCallback != null)
+                mProgressCallback.onProgress(progress); // unknown
         }
-        for (OutputSegments.Segment outputSegment : OutputSegments.getInstance().getSegments()) {
-            mAudioTrackTranscoder.setupDecoder(outputSegment, mExtractor);
-            mVideoTrackTranscoder.setupDecoder(outputSegment, mExtractor);
+        for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
+            mAudioTrackTranscoder.setupDecoders(outputSegment, mExtractor);
+            mVideoTrackTranscoder.setupDecoders(outputSegment, mExtractor);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
-                boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment)
-                        || mAudioTrackTranscoder.stepPipeline(outputSegment);
+                boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment) || mAudioTrackTranscoder.stepPipeline(outputSegment);
                 loopCount++;
                 if (mDurationUs > 0 && loopCount % PROGRESS_INTERVAL_STEPS == 0) {
                     double videoProgress = mVideoTrackTranscoder.isSegmentFinished() ? 1.0 : Math.min(1.0, (double) mVideoTrackTranscoder.getWrittenPresentationTimeUs() / mDurationUs);
@@ -253,9 +247,9 @@ public class MediaTranscoderEngine {
                 }
             }
 
-            mVideoTrackTranscoder.releaseDecoder(outputSegment);
-            mAudioTrackTranscoder.releaseDecoder(outputSegment);
         }
+        mVideoTrackTranscoder.releaseDecoders();
+        mAudioTrackTranscoder.releaseDecoders();
     }
 
     public interface ProgressCallback {

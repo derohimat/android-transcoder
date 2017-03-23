@@ -135,13 +135,21 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
     /**
      * Setup all decoders and texture renderers needed for this segment - called at start of segment processing
+     * We also close any ones not needed for this segment that may have been opened in a previous segment
      * @param segment
      */
     @Override
-    public void setupDecoder(OutputSegments.Segment segment, LinkedHashMap<String, MediaExtractor> extractors) {
+    public void setupDecoders(TimeLine.Segment segment, LinkedHashMap<String, MediaExtractor> extractors) {
+
+        // Release any inactive decoders
+        for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
+            if (!segment.getActiveChannels().containsKey(decoderWrapperEntry.getKey())) {
+                decoderWrapperEntry.getValue().release();
+            }
+        }
 
         // Start any decoders being opened for the first time
-        for (Map.Entry<String, OutputSegments.InputChannel> entry : segment.getVideoChannelsToOpen().entrySet()) {
+        for (Map.Entry<String, TimeLine.InputChannel> entry : segment.getActiveChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(entry.getKey());
             if (decoderWrapper == null) {
                 decoderWrapper = new DecoderWrapper(extractors.get(entry.getKey()));
@@ -154,7 +162,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
         // Create array of texture renderers for each patch in the segment
         mTextureRender = new ArrayList<TextureRender>();
-        for (OutputSegments.VideoPatch videoPatch : segment.getVideoPatches()) {
+        for (TimeLine.VideoPatch videoPatch : segment.getVideoPatches()) {
             OutputSurface surface1 = mDecoderWrappers.get(videoPatch.mInput1).mOutputSurface;
             OutputSurface surface2 = videoPatch.mInput2 != null ? mDecoderWrappers.get(videoPatch.mInput2).mOutputSurface : null;
             TextureRender textureRender = new TextureRender(surface1, surface2);
@@ -169,11 +177,11 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     }
 
     @Override
-    public boolean stepPipeline(OutputSegments.Segment outputSegment) {
+    public boolean stepPipeline(TimeLine.Segment outputSegment) {
         boolean stepped = false;
-
         int status;
-        while (drainEncoder(0) != DRAIN_STATE_NONE) stepped = true;
+        while (drainEncoder(0) != DRAIN_STATE_NONE)
+            stepped = true;
         do {
             status = drainDecoders(outputSegment, 0);
             if (status != DRAIN_STATE_NONE) stepped = true;
@@ -210,13 +218,11 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
     /**
      * Release any decoders not needed in the next segment
-      * @param segment
      */
     @Override
-    public void releaseDecoder(OutputSegments.Segment segment) {
-        for (Map.Entry<String, OutputSegments.InputChannel> entry : segment.getVideoChannelsToClose().entrySet()) {
-            DecoderWrapper decoderWrapper = mDecoderWrappers.get(entry.getKey());
-            decoderWrapper.release();
+    public void releaseDecoders() {
+        for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
+            decoderWrapperEntry.getValue().release();
         }
     }
 
@@ -232,14 +238,14 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
     /**
      * Drain extractors
-     * @param outputSegment
+     * @param segment
      * @param timeoutUs
      * @return DRAIN_STATE_CONSUMED - pipeline has been stepped, DRAIN_STATE_NONE - could not step
      */
-    private int drainExtractors(OutputSegments.Segment outputSegment, long timeoutUs) {
+    private int drainExtractors(TimeLine.Segment segment, long timeoutUs) {
         boolean sampleProcessed = false;
 
-        for (Map.Entry<String, OutputSegments.InputChannel> inputChannelEntry : outputSegment.getVideoChannels().entrySet()) {
+        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getVideoChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
             if (!decoderWrapper.mIsExtractorEOS) {
 
@@ -282,13 +288,13 @@ public class VideoTrackTranscoder implements TrackTranscoder {
      * @param timeoutUs
      * @return
      */
-    private int drainDecoders(OutputSegments.Segment segment, long timeoutUs) {
+    private int drainDecoders(TimeLine.Segment segment, long timeoutUs) {
         boolean consumed = false;
         int textureCount = 0;
         boolean stillStreaming = false;
 
         // Go through each decoder in the segment and get it's frame into a texture
-        for (Map.Entry<String, OutputSegments.InputChannel> inputChannelEntry : segment.getActiveChannels().entrySet()) {
+        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getActiveChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
 
             // Only process if we have not end end of stream for this decoder or extractor

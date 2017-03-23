@@ -21,7 +21,7 @@ import android.os.Looper;
 import android.util.Log;
 
 import net.ypresto.androidtranscoder.engine.MediaTranscoderEngine;
-import net.ypresto.androidtranscoder.engine.OutputSegments;
+import net.ypresto.androidtranscoder.engine.TimeLine;
 import net.ypresto.androidtranscoder.format.MediaFormatPresets;
 import net.ypresto.androidtranscoder.format.MediaFormatStrategy;
 
@@ -159,10 +159,12 @@ public class MediaTranscoder {
      * @param listener          Listener instance for callback.
      */
     public Future<Void> transcodeVideo(final FileDescriptor inFileDescriptor, final String outPath, final MediaFormatStrategy outFormatStrategy, final Listener listener) {
-
-        OutputSegments.getInstance().addChannel("default", inFileDescriptor);
-        OutputSegments.getInstance().createSegment().output("default");
-        return transcodeVideo(outPath, outFormatStrategy, listener);
+        TimeLine timeLine = (new TimeLine())
+            .addChannel("default", inFileDescriptor)
+            .createSegment()
+                .output("default")
+            .timeLine().start();
+        return transcodeVideo(timeLine, outPath, outFormatStrategy, listener);
     }
     /**
      * Transcodes video file asynchronously.
@@ -172,7 +174,7 @@ public class MediaTranscoder {
      * @param outFormatStrategy Strategy for output video format.
      * @param listener          Listener instance for callback.
      */
-    public Future<Void> transcodeVideo(final String outPath, final MediaFormatStrategy outFormatStrategy, final Listener listener) {
+    public Future<Void> transcodeVideo(final TimeLine timeLine, final String outPath, final MediaFormatStrategy outFormatStrategy, final Listener listener) {
         Looper looper = Looper.myLooper();
         if (looper == null) looper = Looper.getMainLooper();
         final Handler handler = new Handler(looper);
@@ -194,7 +196,7 @@ public class MediaTranscoder {
                         });
                     }
                 });
-                engine.transcodeVideo(outPath, outFormatStrategy);
+                engine.transcodeVideo(timeLine, outPath, outFormatStrategy);
             } catch (IOException e) {
                 Log.w(TAG, "Transcode failed: input file not found"
                         + " or could not open output file ('" + outPath + "') .", e);
@@ -253,7 +255,7 @@ public class MediaTranscoder {
         /**
          * Called when transcode failed.
          *
-         * @param exception Exception thrown from {@link MediaTranscoderEngine#transcodeVideo(String, MediaFormatStrategy)}.
+         * @param exception Exception thrown from {@link MediaTranscoderEngine#transcodeVideo(TimeLine, String, MediaFormatStrategy)}.
          *                  Note that it IS NOT {@link java.lang.Throwable}. This means {@link java.lang.Error} won't be caught.
          */
         void onTranscodeFailed(Exception exception);

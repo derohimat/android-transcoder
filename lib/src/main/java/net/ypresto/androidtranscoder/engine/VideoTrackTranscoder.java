@@ -298,7 +298,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
 
             // Only process if we have not end end of stream for this decoder or extractor
-            if (!decoderWrapper.mIsExtractorEOS && !decoderWrapper.mIsDecoderEOS) {
+            if (!decoderWrapper.mIsDecoderEOS) {
 
                 if (!decoderWrapper.mOutputSurface.isTextureReady() &&
                     !decoderWrapper.mOutputSurface.isEndOfInputStream()) {
@@ -349,35 +349,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
         return consumed ? DRAIN_STATE_CONSUMED : DRAIN_STATE_NONE;
     }
-    /*
-    private int drainDecoderOld(long timeoutUs) {
-        if (mIsDecoderEOS) return DRAIN_STATE_NONE;
-        int result = mDecoder.dequeueOutputBuffer(mBufferInfo, timeoutUs);
-        switch (result) {
-            case MediaCodec.INFO_TRY_AGAIN_LATER:
-                return DRAIN_STATE_NONE;
-            case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
-            case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
-                return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
-        }
-        if ((mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-            mEncoder.signalEndOfInputStream();
-            mIsDecoderEOS = true;
-            mBufferInfo.size = 0;
-        }
-        boolean doRender = (mBufferInfo.size > 0);
-        // NOTE: doRender will block if buffer (of encoder) is full.
-        // Refer: http://bigflake.com/mediacodec/CameraToMpegTest.java.txt
-        mDecoder.releaseOutputBuffer(result, doRender);
-        if (doRender) {
-            mDecoderOutputSurfaceWrapper.awaitNewImage();
-            mDecoderOutputSurfaceWrapper.drawImage();
-            mEncoderInputSurfaceWrapper.setPresentationTime(mBufferInfo.presentationTimeUs * 1000);
-            mEncoderInputSurfaceWrapper.swapBuffers();
-        }
-        return DRAIN_STATE_CONSUMED;
-    }
-    */
+
 
     private int drainEncoder(long timeoutUs) {
         if (mIsEncoderEOS) return DRAIN_STATE_NONE;

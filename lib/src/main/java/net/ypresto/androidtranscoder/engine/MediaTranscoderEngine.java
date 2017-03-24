@@ -85,13 +85,13 @@ public class MediaTranscoderEngine {
         if (outputPath == null) {
             throw new NullPointerException("Output path cannot be null.");
         }
-        if (mFirstFileDescriptorWithVideo == null) {
-            throw new IllegalStateException("Data source is not set.");
-        }
         try {
              mMuxer = new MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-            setupMetadata();
             setupTrackTranscoders(timeLine, formatStrategy);
+            if (mFirstFileDescriptorWithVideo == null) {
+                throw new IllegalStateException("Data source is not set.");
+            }
+            setupMetadata();
             runPipelines(timeLine);
             mMuxer.stop();
         } finally {
@@ -166,7 +166,7 @@ public class MediaTranscoderEngine {
         MediaFormat audioOutputFormat = null;
         MediaExtractorUtils.TrackResult trackResult = null;
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : timeLine.getChannels().entrySet()) {
-            if (videoOutputFormat != null || audioOutputFormat != null) {
+            if (videoOutputFormat == null || audioOutputFormat == null) {
                 FileDescriptor fileDescriptor = inputChannelEntry.getValue().mInputFileDescriptor;
                 MediaExtractor mediaExtractor = new MediaExtractor();
                 try {
@@ -226,8 +226,8 @@ public class MediaTranscoderEngine {
                 mProgressCallback.onProgress(progress); // unknown
         }
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
-            mAudioTrackTranscoder.setupDecoders(outputSegment, mExtractor);
-            mVideoTrackTranscoder.setupDecoders(outputSegment, mExtractor);
+            mAudioTrackTranscoder.setupDecoders(outputSegment);
+            mVideoTrackTranscoder.setupDecoders(outputSegment);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
                 boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment) || mAudioTrackTranscoder.stepPipeline(outputSegment);
                 loopCount++;
@@ -248,8 +248,8 @@ public class MediaTranscoderEngine {
             }
 
         }
-        mVideoTrackTranscoder.releaseDecoders();
-        mAudioTrackTranscoder.releaseDecoders();
+        mVideoTrackTranscoder.release();
+        mAudioTrackTranscoder.release();
     }
 
     public interface ProgressCallback {

@@ -56,7 +56,22 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     }
 
     @Override
-    public void setup() {
+    public void setupEncoder() {
+
+        try {
+            mEncoder = MediaCodec.createEncoderByType(mOutputFormat.getString(MediaFormat.KEY_MIME));
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        mEncoder.configure(mOutputFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+        mEncoder.start();
+        mEncoderStarted = true;
+        mEncoderBuffers = new MediaCodecBufferCompatWrapper(mEncoder);
+
+        mAudioChannel = new AudioChannel(mDecoders, mEncoder, mOutputFormat);
+    }
+    @Override
+    public void setupDecoders(TimeLine.Segment segment) {
 
 
         for (Map.Entry<String, MediaExtractor> entry : mExtractors.entrySet()) {
@@ -100,7 +115,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     }
 
     @Override
-    public boolean stepPipeline() {
+    public boolean stepPipeline(TimeLine.Segment segment) {
         boolean busy = false;
 
         int status;
@@ -225,7 +240,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     }
 
     @Override
-    public void release() {
+    public void releaseDecoders() {
         if (mDecoders != null) {
             for (Map.Entry<String, MediaCodec> entry : mDecoders.entrySet()) {
                 MediaCodec decoder = entry.getValue();
@@ -234,10 +249,18 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             }
             mDecoders = null;
         }
+    }
+    @Override
+    public void releaseEncoder() {
         if (mEncoder != null) {
             if (mEncoderStarted) mEncoder.stop();
             mEncoder.release();
             mEncoder = null;
         }
+    }
+    @Override
+    public void release() {
+        releaseDecoders();
+        releaseEncoder();
     }
 }

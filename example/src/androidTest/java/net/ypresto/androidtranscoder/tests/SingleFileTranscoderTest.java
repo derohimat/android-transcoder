@@ -2,6 +2,8 @@ package net.ypresto.androidtranscoder.tests;
 
 import android.os.ParcelFileDescriptor;
 import android.support.test.InstrumentationRegistry;
+import android.support.test.runner.AndroidJUnit4;
+import android.test.suitebuilder.annotation.SmallTest;
 import android.util.Log;
 
 import net.ypresto.androidtranscoder.MediaTranscoder;
@@ -10,6 +12,7 @@ import net.ypresto.androidtranscoder.format.MediaFormatStrategyPresets;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -20,7 +23,8 @@ import java.util.concurrent.ExecutionException;
 
 import static org.junit.Assert.assertEquals;
 
-public class Transcoder {
+@RunWith(AndroidJUnit4.class)
+public class SingleFileTranscoderTest {
     private static final String TAG = "JUnitTranscoder";
     private String inputFileName;
     private String outputFileName;
@@ -39,7 +43,7 @@ public class Transcoder {
             in.close();
             out.close();
         } catch(IOException e) {
-            assertEquals("Exception on file copy", "none", e);
+            assertEquals("Exception on file copy", "none", e + Log.getStackTraceString(e));
         }
     }
 
@@ -61,7 +65,7 @@ public class Transcoder {
             }
             @Override
             public void onTranscodeFailed(Exception e) {
-                assertEquals("onTranscodeFailed", "none", e);
+                assertEquals("onTranscodeFailed", "none", e + Log.getStackTraceString(e));
             }
         };
 
@@ -71,11 +75,11 @@ public class Transcoder {
             (MediaTranscoder.getInstance().transcodeVideo(in.getFileDescriptor(), outputFileName,
                     MediaFormatStrategyPresets.createAndroid720pStrategy(), listener)).get();
         } catch(IOException e) {
-            assertEquals("Exception on Transcode", "none", e);
+            assertEquals("Exception on Transcode", "none", e + Log.getStackTraceString(e));
         } catch(InterruptedException e) {
-            assertEquals("Exception on Transcode", "none", e);
+            assertEquals("Exception on Transcode", "none", e + Log.getStackTraceString(e));
         } catch(ExecutionException e) {
-            assertEquals("Exception on Transcode", "none", e);
+            assertEquals("Exception on Transcode", "none", e + Log.getStackTraceString(e));
 
         }
         File file =new File(outputFileName);

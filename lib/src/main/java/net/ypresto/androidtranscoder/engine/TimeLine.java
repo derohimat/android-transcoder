@@ -136,7 +136,7 @@ public class TimeLine {
      * An input file / start time combination
      */
     public class InputChannel {
-        public Long mInputStartTimeUs;
+        public Long mInputStartTimeUs = 0l;
         public Long mInputEndTimeUs;
         public ChannelType mChannelType;
         public FileDescriptor mInputFileDescriptor = null;

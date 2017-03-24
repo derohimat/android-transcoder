@@ -65,7 +65,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                     inputFormat.setInteger(MediaFormatExtraConstants.KEY_ROTATION_DEGREES, 0);
                 }
                 mOutputSurface = new OutputSurface();
-                MediaCodec decoder = null;
+
                 try {
                     mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
                 } catch (IOException e) {
@@ -74,7 +74,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                 mDecoder.configure(inputFormat, mOutputSurface.getSurface(), null, 0);
                 mDecoder.start();
                 mDecoderStarted = true;
-                mDecoderInputBuffers = decoder.getInputBuffers();
+                mDecoderInputBuffers = mDecoder.getInputBuffers();
             }
         }
 
@@ -97,7 +97,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private static final int DRAIN_STATE_NONE = 0;
     private static final int DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY = 1;
     private static final int DRAIN_STATE_CONSUMED = 2;
-
+    private final LinkedHashMap<String, MediaExtractor> mExtractors;
     private final MediaFormat mOutputFormat;
     private final QueuedMuxer mMuxer;
     private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
@@ -115,6 +115,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                                 MediaFormat outputFormat, QueuedMuxer muxer) {
         mOutputFormat = outputFormat;
         mMuxer = muxer;
+        mExtractors = extractors;
     }
 
     @Override
@@ -139,7 +140,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
      * @param segment
      */
     @Override
-    public void setupDecoders(TimeLine.Segment segment, LinkedHashMap<String, MediaExtractor> extractors) {
+    public void setupDecoders(TimeLine.Segment segment) {
 
         // Release any inactive decoders
         for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
@@ -152,7 +153,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         for (Map.Entry<String, TimeLine.InputChannel> entry : segment.getActiveChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(entry.getKey());
             if (decoderWrapper == null) {
-                decoderWrapper = new DecoderWrapper(extractors.get(entry.getKey()));
+                decoderWrapper = new DecoderWrapper(mExtractors.get(entry.getKey()));
                 mDecoderWrappers.put(entry.getKey(), decoderWrapper);
             }
             if (!decoderWrapper.mDecoderStarted) {
@@ -180,8 +181,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     public boolean stepPipeline(TimeLine.Segment outputSegment) {
         boolean stepped = false;
         int status;
-        while (drainEncoder(0) != DRAIN_STATE_NONE)
-            stepped = true;
+        while (drainEncoder(0) != DRAIN_STATE_NONE) stepped = true;
         do {
             status = drainDecoders(outputSegment, 0);
             if (status != DRAIN_STATE_NONE) stepped = true;
@@ -231,8 +231,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
      */
     @Override
     public void release () {
-        for (Map.Entry<String, DecoderWrapper> entry : mDecoderWrappers.entrySet())
-            mDecoderWrappers.get(entry.getKey()).release();
+        releaseDecoders();
         releaseEncoder();
     }
 

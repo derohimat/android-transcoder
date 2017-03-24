@@ -49,7 +49,12 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
     }
 
     @Override
-    public void setup() {
+    public void setupDecoders(TimeLine.Segment segment) {
+    }
+
+    @Override
+    public void setupEncoder () {
+
     }
 
     @Override
@@ -59,7 +64,7 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
 
     @SuppressLint("Assert")
     @Override
-    public boolean stepPipeline() {
+    public boolean stepPipeline(TimeLine.Segment segment) {
         if (mIsEOS) return false;
         int trackIndex = mExtractor.getSampleTrackIndex();
         if (trackIndex < 0) {
@@ -94,6 +99,12 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
         return mIsEOS;
     }
 
+    @Override
+    public void releaseEncoder() {
+    }
+    @Override
+    public void releaseDecoders() {
+    }
     @Override
     public void release() {
     }

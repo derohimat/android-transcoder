@@ -23,7 +23,7 @@ import java.util.LinkedHashMap;
 public interface TrackTranscoder {
 
     void setupEncoder();
-    void setupDecoders(TimeLine.Segment segment, LinkedHashMap<String, MediaExtractor> extractors);
+    void setupDecoders(TimeLine.Segment segment);
 
     /**
      * Get actual MediaFormat which is used to write to muxer.

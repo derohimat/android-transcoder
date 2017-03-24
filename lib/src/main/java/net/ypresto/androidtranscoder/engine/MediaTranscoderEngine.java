@@ -185,7 +185,7 @@ public class MediaTranscoderEngine {
                 }
                 if (audioOutputFormat == null && trackResult.mAudioTrackFormat != null) {
                     audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat);
-                    mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
+                    mediaExtractor.selectTrack(trackResult.mAudioTrackIndex);
                     mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
                 }
             }

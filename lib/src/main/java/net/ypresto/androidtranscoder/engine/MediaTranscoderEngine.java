@@ -94,6 +94,7 @@ public class MediaTranscoderEngine {
             setupMetadata();
             runPipelines(timeLine);
             mMuxer.stop();
+            Log.d(TAG, "Muxer Stopped");
         } finally {
             try {
                 if (mVideoTrackTranscoder != null) {

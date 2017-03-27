@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Queue;
 
 /**
- * InputChannel of raw audio from decoder to encoder.
+ * InputChannel of raw audio from multiple decoders to a single encoder.
  * Performs the necessary conversion between different input & output audio formats.
  *
  * We currently support upmixing from mono to stereo & downmixing from stereo to mono.
@@ -105,9 +105,11 @@ class AudioChannel {
 
         mOverflowBuffer.presentationTimeUs = 0;
     }
+
     public MediaFormat getDeterminedFormat() {
         return mActualDecodedFormat;
     }
+
     public void drainDecoderBufferAndQueue(String input, final int bufferIndex, final long presentationTimeUs) {
 
         MediaCodecBufferCompatWrapper decoderBuffer = mDecoderBuffers.get(input);

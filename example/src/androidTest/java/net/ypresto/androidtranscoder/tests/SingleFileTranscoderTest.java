@@ -73,7 +73,7 @@ public class SingleFileTranscoderTest {
 
             ParcelFileDescriptor in = ParcelFileDescriptor.open(new File(inputFileName), ParcelFileDescriptor.MODE_READ_ONLY);
             (MediaTranscoder.getInstance().transcodeVideo(in.getFileDescriptor(), outputFileName,
-                    MediaFormatStrategyPresets.createAndroid720pStrategy(), listener)).get();
+                    MediaFormatStrategyPresets.createAndroid720pStrategyMono(), listener)).get();
         } catch(IOException e) {
             assertEquals("Exception on Transcode", "none", e + Log.getStackTraceString(e));
         } catch(InterruptedException e) {

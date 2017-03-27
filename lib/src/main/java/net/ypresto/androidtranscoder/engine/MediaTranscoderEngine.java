@@ -46,6 +46,7 @@ public class MediaTranscoderEngine {
     private volatile double mProgress;
     private ProgressCallback mProgressCallback;
     private long mDurationUs;
+    private long mOutputPresentationTimeExtractedUs = 0l;
 
     /**
      * Do not use this constructor unless you know what you are doing.
@@ -227,10 +228,13 @@ public class MediaTranscoderEngine {
                 mProgressCallback.onProgress(progress); // unknown
         }
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
+            outputSegment.start(mOutputPresentationTimeExtractedUs);
             mAudioTrackTranscoder.setupDecoders(outputSegment);
             mVideoTrackTranscoder.setupDecoders(outputSegment);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
                 boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment) || mAudioTrackTranscoder.stepPipeline(outputSegment);
+                mOutputPresentationTimeExtractedUs = Math.max(mVideoTrackTranscoder.getOutputPresentationTimeExtractedUs(),
+                        mAudioTrackTranscoder.getOutputPresentationTimeExtractedUs());
                 loopCount++;
                 if (mDurationUs > 0 && loopCount % PROGRESS_INTERVAL_STEPS == 0) {
                     double videoProgress = mVideoTrackTranscoder.isSegmentFinished() ? 1.0 : Math.min(1.0, (double) mVideoTrackTranscoder.getWrittenPresentationTimeUs() / mDurationUs);

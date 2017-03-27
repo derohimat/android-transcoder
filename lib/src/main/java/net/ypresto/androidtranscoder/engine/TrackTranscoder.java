@@ -22,6 +22,8 @@ import java.util.LinkedHashMap;
 
 public interface TrackTranscoder {
 
+
+
     void setupEncoder();
     void setupDecoders(TimeLine.Segment segment);
 
@@ -47,6 +49,8 @@ public interface TrackTranscoder {
      * @return Presentation time in micro-second. Return value is undefined if finished writing.
      */
     long getWrittenPresentationTimeUs();
+
+    long getOutputPresentationTimeExtractedUs();
 
     abstract boolean isSegmentFinished();
 

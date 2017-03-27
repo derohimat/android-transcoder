@@ -163,7 +163,7 @@ public class MediaTranscoder {
             .addChannel("default", inFileDescriptor)
             .createSegment()
                 .output("default")
-            .timeLine().start();
+            .timeLine();
         return transcodeVideo(timeLine, outPath, outFormatStrategy, listener);
     }
     /**

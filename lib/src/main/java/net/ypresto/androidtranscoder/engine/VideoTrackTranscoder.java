@@ -109,6 +109,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private boolean mIsSegmentFinished;
     private boolean mEncoderStarted;
     private long mWrittenPresentationTimeUs;
+    private long mOutputPresentationTimeExtractedUs;
     private List <TextureRender> mTextureRender;
 
     public VideoTrackTranscoder(LinkedHashMap<String, MediaExtractor> extractors,
@@ -144,13 +145,13 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
         // Release any inactive decoders
         for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
-            if (!segment.getActiveChannels().containsKey(decoderWrapperEntry.getKey())) {
+            if (!segment.getChannels().containsKey(decoderWrapperEntry.getKey())) {
                 decoderWrapperEntry.getValue().release();
             }
         }
 
         // Start any decoders being opened for the first time
-        for (Map.Entry<String, TimeLine.InputChannel> entry : segment.getActiveChannels().entrySet()) {
+        for (Map.Entry<String, TimeLine.InputChannel> entry : segment.getChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(entry.getKey());
             if (decoderWrapper == null) {
                 decoderWrapper = new DecoderWrapper(mExtractors.get(entry.getKey()));
@@ -195,6 +196,11 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     @Override
     public long getWrittenPresentationTimeUs() {
         return mWrittenPresentationTimeUs;
+    }
+
+    @Override
+    public long getOutputPresentationTimeExtractedUs() {
+        return mOutputPresentationTimeExtractedUs;
     }
 
     @Override
@@ -244,9 +250,10 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private int drainExtractors(TimeLine.Segment segment, long timeoutUs) {
         boolean sampleProcessed = false;
 
-        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getVideoChannels().entrySet()) {
+        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getChannels().entrySet()) {
+
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
-            if (!decoderWrapper.mIsExtractorEOS) {
+            if (!decoderWrapper.mIsExtractorEOS && inputChannelEntry.getValue().mPresentationOutputTime <= mOutputPresentationTimeExtractedUs) {
 
                 // Find out which track the extractor has samples for next
                 int trackIndex = decoderWrapper.mExtractor.getSampleTrackIndex();
@@ -271,6 +278,8 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                 }
 
                 // Get the sample into the buffer
+                mOutputPresentationTimeExtractedUs = decoderWrapper.mExtractor.getSampleTime();
+                inputChannelEntry.getValue().mPresentationOutputTime = mOutputPresentationTimeExtractedUs;
                 int sampleSize = decoderWrapper.mExtractor.readSampleData(decoderWrapper.mDecoderInputBuffers[result], 0);
                 boolean isKeyFrame = (decoderWrapper.mExtractor.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0;
                 decoderWrapper.mDecoder.queueInputBuffer(result, 0, sampleSize, decoderWrapper.mExtractor.getSampleTime(), isKeyFrame ? MediaCodec.BUFFER_FLAG_SYNC_FRAME : 0);
@@ -293,7 +302,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         boolean stillStreaming = false;
 
         // Go through each decoder in the segment and get it's frame into a texture
-        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getActiveChannels().entrySet()) {
+        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
 
             // Only process if we have not end end of stream for this decoder or extractor
@@ -321,15 +330,24 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                     // NOTE: doRender will block if buffer (of encoder) is full.
                     // Refer: http://bigflake.com/mediacodec/CameraToMpegTest.java.txt
 
-                    decoderWrapper.mDecoder.releaseOutputBuffer(result, doRender);
+                    // If we are past where we want to start decoding render buffer to surface and process frame
                     if (doRender && mBufferInfo.presentationTimeUs >= inputChannelEntry.getValue().mInputStartTimeUs) {
+                        decoderWrapper.mDecoder.releaseOutputBuffer(result, true);
                         decoderWrapper.mOutputSurface.awaitNewImage();
                         decoderWrapper.mOutputSurface.setTextureReady();
                         ++textureCount;
                         consumed = true;
-                    } else if (doRender && inputChannelEntry.getValue().mInputEndTimeUs != null  &&
-                            mBufferInfo.presentationTimeUs >= inputChannelEntry.getValue().mInputEndTimeUs)
+
+                        // If we are past the end of where we want to process signal segment finished
+                    } else if (doRender && inputChannelEntry.getValue().mInputEndTimeUs != null &&
+                            mBufferInfo.presentationTimeUs >= inputChannelEntry.getValue().mInputEndTimeUs) {
                         mIsSegmentFinished = true;
+                        decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
+                    } else {
+                        // Otherwise we release it without rendering
+                        decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
+                    }
+
                 }
             }
         }

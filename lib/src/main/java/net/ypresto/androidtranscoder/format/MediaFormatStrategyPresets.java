@@ -43,6 +43,16 @@ public class MediaFormatStrategyPresets {
     }
 
     /**
+     * Preset based on Nexus 4 camera recording with 720p quality mixing to mono
+     * This preset is ensured to work on any Android &gt;=4.3 devices by Android CTS (if codec is available).
+     * Audio track will be copied as-is.
+     *
+     */
+    public static MediaFormatStrategy createAndroid720pStrategyMono() {
+        return new Android720pFormatStrategy(Android720pFormatStrategy.DEFAULT_VIDEO_BITRATE,  Android720pFormatStrategy.AUDIO_BITRATE_AS_IS, 1);
+    }
+
+    /**
      * Preset based on Nexus 4 camera recording with 720p quality.
      * This preset is ensured to work on any Android &gt;=4.3 devices by Android CTS (if codec is available).
      * <p/>

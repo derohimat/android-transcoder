@@ -25,7 +25,7 @@ class Android720pFormatStrategy implements MediaFormatStrategy {
     private static final String TAG = "720pFormatStrategy";
     private static final int LONGER_LENGTH = 1280;
     private static final int SHORTER_LENGTH = 720;
-    private static final int DEFAULT_VIDEO_BITRATE = 8000 * 1000; // From Nexus 4 Camera in 720p
+    public static final int DEFAULT_VIDEO_BITRATE = 8000 * 1000; // From Nexus 4 Camera in 720p
     private final int mVideoBitrate;
     private final int mAudioBitrate;
     private final int mAudioChannels;
@@ -78,7 +78,7 @@ class Android720pFormatStrategy implements MediaFormatStrategy {
 
     @Override
     public MediaFormat createAudioOutputFormat(MediaFormat inputFormat) {
-        if (mAudioBitrate == AUDIO_BITRATE_AS_IS || mAudioChannels == AUDIO_CHANNELS_AS_IS) return null;
+        if (mAudioBitrate == AUDIO_BITRATE_AS_IS && mAudioChannels == AUDIO_CHANNELS_AS_IS) return null;
 
         // Use original sample rate, as resampling is not supported yet.
         final MediaFormat format = MediaFormat.createAudioFormat(MediaFormatExtraConstants.MIMETYPE_AUDIO_AAC,

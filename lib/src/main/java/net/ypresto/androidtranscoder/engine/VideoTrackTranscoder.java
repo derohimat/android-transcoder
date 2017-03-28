@@ -313,6 +313,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                     int result = decoderWrapper.mDecoder.dequeueOutputBuffer(mBufferInfo, timeoutUs);
                     switch (result) {
                         case MediaCodec.INFO_TRY_AGAIN_LATER:
+                            stillStreaming = true;
                             continue;
                         case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
                         case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:

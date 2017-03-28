@@ -71,7 +71,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         public void start() {
             MediaExtractorUtils.TrackResult trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(mExtractor);
             if (trackResult.mAudioTrackFormat != null) {
-                int trackIndex = trackResult.mVideoTrackIndex;
+                int trackIndex = trackResult.mAudioTrackIndex;
                 mTrackIndex = trackIndex;
                 mExtractor.selectTrack(trackIndex);
                 MediaFormat inputFormat = mExtractor.getTrackFormat(trackIndex);
@@ -132,10 +132,10 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             if (decoderWrapper == null) {
                 decoderWrapper = new DecoderWrapper(mExtractors.get(entry.getKey()));
                 mDecoderWrappers.put(entry.getKey(), decoderWrapper);
-                decoders.put(entry.getKey(), decoderWrapper.mDecoder);
             }
             if (!decoderWrapper.mDecoderStarted) {
                 decoderWrapper.start();
+                decoders.put(entry.getKey(), decoderWrapper.mDecoder);
             }
         }
 
@@ -227,6 +227,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             int result = decoderWrapper.mDecoder.dequeueOutputBuffer(mBufferInfo, timeoutUs);
             switch (result) {
                 case MediaCodec.INFO_TRY_AGAIN_LATER:
+                    stillStreaming = true;
                     continue;
                 case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
                     mAudioChannel.setActualDecodedFormat(decoderWrapper.mDecoder.getOutputFormat());

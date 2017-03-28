@@ -143,7 +143,13 @@ class AudioChannel {
 
     public boolean feedEncoder(long timeoutUs) {
         final boolean hasOverflow = mOverflowBuffer.data != null && mOverflowBuffer.data.hasRemaining();
-        if (mFilledBuffers.isEmpty() && !hasOverflow) {
+        boolean isEmpty = true;
+        for (Map.Entry<String, Queue<AudioBuffer>> entry : mFilledBuffers.entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                isEmpty = false;
+            }
+        }
+        if (isEmpty && !hasOverflow) {
             // No audio data - Bail out
             return false;
         }

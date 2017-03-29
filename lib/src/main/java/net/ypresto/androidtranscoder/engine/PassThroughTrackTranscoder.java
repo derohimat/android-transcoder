@@ -35,6 +35,7 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
     private MediaFormat mActualOutputFormat;
     private long mWrittenPresentationTimeUs;
     private long mOutputPresentationTimeExtractedUs;
+    private long mOutputPresentationTimeDecodedUs;
 
     public PassThroughTrackTranscoder(MediaExtractor extractor, int trackIndex,
                                       QueuedMuxer muxer, QueuedMuxer.SampleType sampleType) {
@@ -97,6 +98,10 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
 
     @Override
     public long getOutputPresentationTimeExtractedUs() { return mOutputPresentationTimeExtractedUs; }
+
+    @Override
+    public long getOutputPresentationTimeDecodedUs() { return mOutputPresentationTimeDecodedUs; }
+
 
     @Override
     public boolean isSegmentFinished() {

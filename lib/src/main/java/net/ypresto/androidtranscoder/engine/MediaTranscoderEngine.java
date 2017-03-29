@@ -46,8 +46,9 @@ public class MediaTranscoderEngine {
     private volatile double mProgress;
     private ProgressCallback mProgressCallback;
     private long mDurationUs;
-    private long mOutputPresentationTimeExtractedUs = 0l;
-
+    private long mVideoOutputPresentationTimeExtractedUs = 0l;
+    private long mAudioOutputPresentationTimeExtractedUs = 0l;
+    private long mOutputPresentationTimeDecodedUs = 0l;
     /**
      * Do not use this constructor unless you know what you are doing.
      */
@@ -168,26 +169,29 @@ public class MediaTranscoderEngine {
         MediaFormat audioOutputFormat = null;
         MediaExtractorUtils.TrackResult trackResult = null;
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : timeLine.getChannels().entrySet()) {
-            if (videoOutputFormat == null || audioOutputFormat == null) {
-                FileDescriptor fileDescriptor = inputChannelEntry.getValue().mInputFileDescriptor;
-                MediaExtractor mediaExtractor = new MediaExtractor();
-                try {
-                    mediaExtractor.setDataSource(fileDescriptor);
-                } catch (IOException e) {
-                    Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
-                    throw e;
-                }
-                trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(mediaExtractor);
-                if (videoOutputFormat == null && trackResult.mVideoTrackFormat != null) {
+
+            FileDescriptor fileDescriptor = inputChannelEntry.getValue().mInputFileDescriptor;
+            MediaExtractor mediaExtractor = new MediaExtractor();
+            try {
+                mediaExtractor.setDataSource(fileDescriptor);
+            } catch (IOException e) {
+                Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
+                throw e;
+            }
+            trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(mediaExtractor);
+            if (trackResult.mVideoTrackFormat != null) {
+                mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
+                mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
+                if (videoOutputFormat == null) {
                     videoOutputFormat = formatStrategy.createVideoOutputFormat(trackResult.mVideoTrackFormat);
-                    mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
-                    mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
                     mFirstFileDescriptorWithVideo = fileDescriptor;
                 }
-                if (audioOutputFormat == null && trackResult.mAudioTrackFormat != null) {
+            }
+            if (trackResult.mAudioTrackFormat != null) {
+                mediaExtractor.selectTrack(trackResult.mAudioTrackIndex);
+                mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
+                if (audioOutputFormat == null) {
                     audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat);
-                    mediaExtractor.selectTrack(trackResult.mAudioTrackIndex);
-                    mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
                 }
             }
         }
@@ -228,13 +232,14 @@ public class MediaTranscoderEngine {
                 mProgressCallback.onProgress(progress); // unknown
         }
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
-            outputSegment.start(mOutputPresentationTimeExtractedUs);
+            outputSegment.start(mOutputPresentationTimeDecodedUs, mVideoOutputPresentationTimeExtractedUs, mAudioOutputPresentationTimeExtractedUs);
             mAudioTrackTranscoder.setupDecoders(outputSegment);
             mVideoTrackTranscoder.setupDecoders(outputSegment);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
                 boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment) || mAudioTrackTranscoder.stepPipeline(outputSegment);
-                mOutputPresentationTimeExtractedUs = Math.max(mVideoTrackTranscoder.getOutputPresentationTimeExtractedUs(),
-                        mAudioTrackTranscoder.getOutputPresentationTimeExtractedUs());
+                mVideoOutputPresentationTimeExtractedUs = mVideoTrackTranscoder.getOutputPresentationTimeExtractedUs();
+                mAudioOutputPresentationTimeExtractedUs = mAudioTrackTranscoder.getOutputPresentationTimeExtractedUs();
+                mOutputPresentationTimeDecodedUs = mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs();
                 loopCount++;
                 if (mDurationUs > 0 && loopCount % PROGRESS_INTERVAL_STEPS == 0) {
                     double videoProgress = mVideoTrackTranscoder.isSegmentFinished() ? 1.0 : Math.min(1.0, (double) mVideoTrackTranscoder.getWrittenPresentationTimeUs() / mDurationUs);

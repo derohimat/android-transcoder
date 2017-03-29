@@ -25,6 +25,8 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     private final QueuedMuxer mMuxer;
     private long mWrittenPresentationTimeUs;
     private long mOutputPresentationTimeExtractedUs;
+    private long mPresentationTimeOffsetUs = 0l;
+    private long mOutputPresentationTimeDecodedUs;
 
     private LinkedHashMap<String, Integer> mTrackIndexes;
     private final LinkedHashMap<String, MediaFormat> mInputFormat;
@@ -111,7 +113,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         mEncoder.start();
         mEncoderStarted = true;
         mEncoderBuffers = new MediaCodecBufferCompatWrapper(mEncoder);
-        mIsSegmentFinished = false;
 
     }
     @Override
@@ -121,6 +122,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
             if (!segment.getChannels().containsKey(decoderWrapperEntry.getKey())) {
                 decoderWrapperEntry.getValue().release();
+                mDecoderWrappers.remove(decoderWrapperEntry.getKey());
             }
         }
 
@@ -141,11 +143,14 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
         // Setup an audio channel that will mix from multiple decoders
         mAudioChannel = new AudioChannel(decoders, mEncoder, mOutputFormat);
+        mIsSegmentFinished = false;
+        mPresentationTimeOffsetUs = segment.mPresentationOutputTimeDecodedUs;
+        mIsEncoderEOS = false;
     }
 
     @Override
     public MediaFormat getDeterminedFormat() {
-        return mAudioChannel.getDeterminedFormat();
+        return mActualOutputFormat;
     }
 
     @Override
@@ -173,7 +178,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : outputSegment.getChannels().entrySet()) {
 
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
-            if (!decoderWrapper.mIsExtractorEOS && inputChannelEntry.getValue().mPresentationOutputTime <= mOutputPresentationTimeExtractedUs) {
+            if (!decoderWrapper.mIsExtractorEOS /*&& inputChannelEntry.getValue().mPresentationAudioOutputTime <= mOutputPresentationTimeExtractedUs*/) {
 
                 // Find out which track the extractor has samples for next
                 int trackIndex = decoderWrapper.mExtractor.getSampleTrackIndex();
@@ -199,7 +204,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
                 // Get the sample into the buffer
                 mOutputPresentationTimeExtractedUs = decoderWrapper.mExtractor.getSampleTime();
-                inputChannelEntry.getValue().mPresentationOutputTime = mOutputPresentationTimeExtractedUs;
+                inputChannelEntry.getValue().mPresentationAudioOutputTime = mOutputPresentationTimeExtractedUs;
 
 
 
@@ -218,8 +223,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     private int drainDecoder(TimeLine.Segment segment, long timeoutUs) {
         boolean consumed = false;
 
-        boolean stillStreaming = false;
-
         // Go through each decoder in the segment and get it's frame into a texture
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
@@ -227,7 +230,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             int result = decoderWrapper.mDecoder.dequeueOutputBuffer(mBufferInfo, timeoutUs);
             switch (result) {
                 case MediaCodec.INFO_TRY_AGAIN_LATER:
-                    stillStreaming = true;
                     continue;
                 case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
                     mAudioChannel.setActualDecodedFormat(decoderWrapper.mDecoder.getOutputFormat());
@@ -239,14 +241,11 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                 decoderWrapper.mIsDecoderEOS = true;
                 mAudioChannel.drainDecoderBufferAndQueue(inputChannelEntry.getKey(), AudioChannel.BUFFER_INDEX_END_OF_STREAM, 0);
             } else if (mBufferInfo.size > 0) {
-                mAudioChannel.drainDecoderBufferAndQueue(inputChannelEntry.getKey(), result, mBufferInfo.presentationTimeUs);
-                stillStreaming = true;
+                mOutputPresentationTimeDecodedUs = mBufferInfo.presentationTimeUs + mPresentationTimeOffsetUs;
+                mAudioChannel.drainDecoderBufferAndQueue(inputChannelEntry.getKey(), result, mOutputPresentationTimeDecodedUs);
             }
 
         }
-
-        if (!stillStreaming)
-            mIsSegmentFinished = true;
 
         return consumed ? DRAIN_STATE_CONSUMED : DRAIN_STATE_NONE;
     }
@@ -276,6 +275,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
         if ((mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
             mIsEncoderEOS = true;
+            mIsSegmentFinished = true;
             mBufferInfo.set(0, 0, 0, mBufferInfo.flags);
         }
         if ((mBufferInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
@@ -297,6 +297,9 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     @Override
     public long getOutputPresentationTimeExtractedUs() {
         return mOutputPresentationTimeExtractedUs;
+    }
+    public long getOutputPresentationTimeDecodedUs() {
+        return mOutputPresentationTimeDecodedUs;
     }
 
 

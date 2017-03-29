@@ -7,6 +7,7 @@ import android.test.suitebuilder.annotation.SmallTest;
 import android.util.Log;
 
 import net.ypresto.androidtranscoder.MediaTranscoder;
+import net.ypresto.androidtranscoder.engine.TimeLine;
 import net.ypresto.androidtranscoder.format.MediaFormatStrategyPresets;
 
 
@@ -30,6 +31,27 @@ public class SingleFileTranscoderTest {
     private String outputFileName;
     private String status = "not started";
 
+    MediaTranscoder.Listener listener = new MediaTranscoder.Listener() {
+        @Override
+        public void onTranscodeProgress(double progress) {
+            Log.d(TAG, "Progress " + progress);
+        }
+        @Override
+        public void onTranscodeCompleted() {
+            Log.d(TAG, "Complete");
+            status = "complete";
+        }
+        @Override
+        public void onTranscodeCanceled() {
+            status = "canceled";
+        }
+        @Override
+        public void onTranscodeFailed(Exception e) {
+            assertEquals("onTranscodeFailed", "none", e + Log.getStackTraceString(e));
+        }
+    };
+
+
     @Before
     public void retrieveVideo ()  {
         inputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input.mp4";
@@ -46,34 +68,53 @@ public class SingleFileTranscoderTest {
             assertEquals("Exception on file copy", "none", e + Log.getStackTraceString(e));
         }
     }
-
+/*
     @Test
-    public void Transcode() {
-        MediaTranscoder.Listener listener = new MediaTranscoder.Listener() {
+    public void TranscodeToMono() {
+        runTest(new Transcode() {
             @Override
-            public void onTranscodeProgress(double progress) {
-                Log.d(TAG, "Progress " + progress);
-            }
-            @Override
-            public void onTranscodeCompleted() {
-                Log.d(TAG, "Complete");
-                status = "complete";
-            }
-            @Override
-            public void onTranscodeCanceled() {
-                status = "canceled";
-            }
-            @Override
-            public void onTranscodeFailed(Exception e) {
-                assertEquals("onTranscodeFailed", "none", e + Log.getStackTraceString(e));
-            }
-        };
+            public void run() throws IOException, InterruptedException, ExecutionException {
+                ParcelFileDescriptor in = ParcelFileDescriptor.open(new File(inputFileName), ParcelFileDescriptor.MODE_READ_ONLY);
+                (MediaTranscoder.getInstance().transcodeVideo(
+                    in.getFileDescriptor(), outputFileName,
+                    MediaFormatStrategyPresets.createAndroid720pStrategyMono(),
+                    listener)
+                ).get();
 
+            }
+        });
+    }
+    */
+    @Test
+    public void TranscodeTwoFiles() {
+        runTest(new Transcode() {
+            @Override
+            public void run() throws IOException, InterruptedException, ExecutionException {
+                ParcelFileDescriptor in = ParcelFileDescriptor.open(new File(inputFileName), ParcelFileDescriptor.MODE_READ_ONLY);
+                TimeLine timeline = new TimeLine()
+                        .addChannel("A", in.getFileDescriptor())
+                        .addChannel("B", in.getFileDescriptor())
+                        .createSegment()
+                            .output("A")
+                            .timeLine()
+                        .createSegment()
+                            .output("B")
+                            .timeLine();
+                (MediaTranscoder.getInstance().transcodeVideo(
+                        timeline, outputFileName,
+                        MediaFormatStrategyPresets.createAndroid720pStrategyMono(),
+                        listener)
+                ).get();
+
+            }
+        });
+    }
+    public interface Transcode {
+        void run () throws IOException, InterruptedException, ExecutionException;
+    }
+    private void runTest(Transcode callback) {
         try {
-
-            ParcelFileDescriptor in = ParcelFileDescriptor.open(new File(inputFileName), ParcelFileDescriptor.MODE_READ_ONLY);
-            (MediaTranscoder.getInstance().transcodeVideo(in.getFileDescriptor(), outputFileName,
-                    MediaFormatStrategyPresets.createAndroid720pStrategyMono(), listener)).get();
+            callback.run();
         } catch(IOException e) {
             assertEquals("Exception on Transcode", "none", e + Log.getStackTraceString(e));
         } catch(InterruptedException e) {
@@ -86,6 +127,7 @@ public class SingleFileTranscoderTest {
         Log.d(TAG, " output file size " + file.length());
         assertEquals("Completed", status, "complete");
     }
+
 
     // Helpers
     private void copyFile(InputStream in, OutputStream out) throws IOException {

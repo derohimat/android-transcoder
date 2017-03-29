@@ -115,7 +115,8 @@ public class TimeLine {
      */
     public class InputChannel {
         public Long mInputStartTimeUs = 0l;
-        public Long mPresentationOutputTime;
+        public Long mPresentationAudioOutputTime;
+        public Long mPresentationVideoOutputTime;
         public Long mInputEndTimeUs;
         public ChannelType mChannelType;
         public FileDescriptor mInputFileDescriptor = null;
@@ -135,14 +136,18 @@ public class TimeLine {
         private HashMap<String, Long> mSeeks = new HashMap<String, Long>();
         private HashMap<String, Long> mDurations = new HashMap<String, Long>();
         private HashMap<String, InputChannel> mChannels = new HashMap<String, InputChannel>();
+        public Long mPresentationOutputTimeDecodedUs;
 
-        public void start (Long presentationOutputTime) {
+        public void start (Long presentationOutputTimeDecodedUs, Long presentationVideoOutputTime, Long presentationAudioOutputTime) {
+
+            mPresentationOutputTimeDecodedUs = presentationOutputTimeDecodedUs;
 
             for (HashMap.Entry<String, InputChannel> inputChannelEntry : mChannels.entrySet()) {
 
                 InputChannel inputChannel = inputChannelEntry.getValue();
 
-                inputChannel.mPresentationOutputTime = presentationOutputTime - inputChannel.mInputStartTimeUs;
+                inputChannel.mPresentationAudioOutputTime = presentationAudioOutputTime - inputChannel.mInputStartTimeUs;
+                inputChannel.mPresentationVideoOutputTime = presentationVideoOutputTime - inputChannel.mInputStartTimeUs;
 
                 // Update start time as long it is greater than current position
                 Long startTimeUs = mSeeks.get(inputChannelEntry.getKey());

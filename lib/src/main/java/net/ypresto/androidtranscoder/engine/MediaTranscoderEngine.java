@@ -239,7 +239,7 @@ public class MediaTranscoderEngine {
                 boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment) || mAudioTrackTranscoder.stepPipeline(outputSegment);
                 mVideoOutputPresentationTimeExtractedUs = mVideoTrackTranscoder.getOutputPresentationTimeExtractedUs();
                 mAudioOutputPresentationTimeExtractedUs = mAudioTrackTranscoder.getOutputPresentationTimeExtractedUs();
-                mOutputPresentationTimeDecodedUs = mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs();
+                mOutputPresentationTimeDecodedUs = Math.max(mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(), mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
                 loopCount++;
                 if (mDurationUs > 0 && loopCount % PROGRESS_INTERVAL_STEPS == 0) {
                     double videoProgress = mVideoTrackTranscoder.isSegmentFinished() ? 1.0 : Math.min(1.0, (double) mVideoTrackTranscoder.getWrittenPresentationTimeUs() / mDurationUs);
@@ -260,6 +260,7 @@ public class MediaTranscoderEngine {
         }
         mVideoTrackTranscoder.release();
         mAudioTrackTranscoder.release();
+        Log.d(TAG, "Transcoders released last video presentation time written was " + mVideoTrackTranscoder.getWrittenPresentationTimeUs());
     }
 
     public interface ProgressCallback {

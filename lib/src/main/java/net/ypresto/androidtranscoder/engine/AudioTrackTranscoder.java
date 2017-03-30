@@ -3,6 +3,7 @@ package net.ypresto.androidtranscoder.engine;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
+import android.util.Log;
 
 import net.ypresto.androidtranscoder.compat.MediaCodecBufferCompatWrapper;
 import net.ypresto.androidtranscoder.utils.MediaExtractorUtils;
@@ -14,7 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class AudioTrackTranscoder implements TrackTranscoder {
-
+    private static final String TAG = "MediaTranscoderEngine";
     private static final QueuedMuxer.SampleType SAMPLE_TYPE = QueuedMuxer.SampleType.AUDIO;
 
     private static final int DRAIN_STATE_NONE = 0;
@@ -44,6 +45,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
     private AudioChannel mAudioChannel;
     private boolean mIsSegmentFinished;
+    private boolean mIsLastSegment = false;
 
     public AudioTrackTranscoder(LinkedHashMap<String, MediaExtractor> extractor,
                                 MediaFormat outputFormat, QueuedMuxer muxer) {
@@ -146,6 +148,8 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         mIsSegmentFinished = false;
         mPresentationTimeOffsetUs = segment.mPresentationOutputTimeDecodedUs;
         mIsEncoderEOS = false;
+        mIsLastSegment = segment.isLastSegment;
+        Log.d(TAG, "starting an audio segment");
     }
 
     @Override
@@ -237,13 +241,18 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
             }
             consumed = true;
+            Log.d(TAG, "processing decoded audio");
             if ((mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                 decoderWrapper.mIsDecoderEOS = true;
-                mAudioChannel.drainDecoderBufferAndQueue(inputChannelEntry.getKey(), AudioChannel.BUFFER_INDEX_END_OF_STREAM, 0);
+                if (mIsLastSegment)
+                    mAudioChannel.drainDecoderBufferAndQueue(inputChannelEntry.getKey(), AudioChannel.BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l);
+                else
+                    mIsSegmentFinished = true;
             } else if (mBufferInfo.size > 0) {
                 mOutputPresentationTimeDecodedUs = mBufferInfo.presentationTimeUs + mPresentationTimeOffsetUs;
-                mAudioChannel.drainDecoderBufferAndQueue(inputChannelEntry.getKey(), result, mOutputPresentationTimeDecodedUs);
+                mAudioChannel.drainDecoderBufferAndQueue(inputChannelEntry.getKey(), result, mBufferInfo.presentationTimeUs, mPresentationTimeOffsetUs, inputChannelEntry.getValue().mInputStartTimeUs, inputChannelEntry.getValue().mInputEndTimeUs);
             }
+            Log.d(TAG, "processed decoded audio");
 
         }
 
@@ -283,9 +292,12 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             mEncoder.releaseOutputBuffer(result, false);
             return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
         }
+        Log.d(TAG, "writeSampleData");
         mMuxer.writeSampleData(SAMPLE_TYPE, mEncoderBuffers.getOutputBuffer(result), mBufferInfo);
         mWrittenPresentationTimeUs = mBufferInfo.presentationTimeUs;
+        Log.d(TAG, "releaseOutputBuffer");
         mEncoder.releaseOutputBuffer(result, false);
+        Log.d(TAG, "processed encoded audio - DRAIN_STATE_CONSUMED");
         return DRAIN_STATE_CONSUMED;
     }
 

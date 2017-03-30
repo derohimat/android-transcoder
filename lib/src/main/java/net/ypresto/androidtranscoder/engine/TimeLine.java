@@ -43,6 +43,8 @@ public class TimeLine {
     public TimeLine () {}
 
     public Segment createSegment() {
+        for (Segment segment : mSegments)
+            segment.isLastSegment = false;
         Segment segment = new Segment(this);
         mSegments.add(segment);
         return segment;
@@ -137,6 +139,7 @@ public class TimeLine {
         private HashMap<String, Long> mDurations = new HashMap<String, Long>();
         private HashMap<String, InputChannel> mChannels = new HashMap<String, InputChannel>();
         public Long mPresentationOutputTimeDecodedUs;
+        public boolean isLastSegment = true;
 
         public void start (Long presentationOutputTimeDecodedUs, Long presentationVideoOutputTime, Long presentationAudioOutputTime) {
 
@@ -152,9 +155,7 @@ public class TimeLine {
                 // Update start time as long it is greater than current position
                 Long startTimeUs = mSeeks.get(inputChannelEntry.getKey());
                 if (startTimeUs != null) {
-                    if (startTimeUs > inputChannel.mInputEndTimeUs) {
-                        inputChannel.mInputStartTimeUs = startTimeUs;
-                    }
+                    inputChannel.mInputStartTimeUs = startTimeUs;
                 }
 
                 // Update duration and set channel duration to overridden duration or leave as null (end of stream)
@@ -189,7 +190,7 @@ public class TimeLine {
          * @return
          */
         public Segment duration(String channel, long time) {
-            this.mDurations.put(channel, time);
+            this.mDurations.put(channel, time * 1000l);
             return this;
         }
 
@@ -200,7 +201,7 @@ public class TimeLine {
          * @return
          */
         public Segment seek(String channel, long time) {
-            this.mSeeks.put(channel, time);
+            this.mSeeks.put(channel, time * 1000l);
             return this;
         }
 

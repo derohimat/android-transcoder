@@ -95,6 +95,7 @@ public class SingleFileTranscoderTest {
                         .addChannel("A", in.getFileDescriptor())
                         .addChannel("B", in.getFileDescriptor())
                         .createSegment()
+                            .seek("A", 2000)
                             .output("A")
                             .timeLine()
                         .createSegment()

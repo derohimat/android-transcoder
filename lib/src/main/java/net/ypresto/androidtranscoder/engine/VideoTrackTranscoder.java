@@ -113,6 +113,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private long mOutputPresentationTimeExtractedUs;
     private long mPresentationTimeOffsetUs = 0l;
     private List <TextureRender> mTextureRender;
+    private boolean mIsLastSegment = false;
 
     public VideoTrackTranscoder(LinkedHashMap<String, MediaExtractor> extractors,
                                 MediaFormat outputFormat, QueuedMuxer muxer) {
@@ -176,6 +177,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         mIsSegmentFinished = false;
         mPresentationTimeOffsetUs = segment.mPresentationOutputTimeDecodedUs;
         mIsEncoderEOS = false;
+        mIsLastSegment = segment.isLastSegment;
     }
 
     @Override
@@ -334,6 +336,17 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                         mBufferInfo.size = 0;
                         decoderWrapper.mOutputSurface.signalEndOfInputStream();
                         decoderWrapper.mIsDecoderEOS = true;
+                    }
+                    boolean isDecoderEndOfStream = true;
+                    for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
+                        if (!decoderWrapperEntry.getValue().mIsDecoderEOS)
+                            isDecoderEndOfStream = false;
+                    }
+                    if (isDecoderEndOfStream) {
+                        if (mIsLastSegment)
+                            mEncoder.signalEndOfInputStream();
+                        else
+                            mIsSegmentFinished = true;
                     }
                     boolean doRender = (mBufferInfo.size > 0);
                     // NOTE: doRender will block if buffer (of encoder) is full.

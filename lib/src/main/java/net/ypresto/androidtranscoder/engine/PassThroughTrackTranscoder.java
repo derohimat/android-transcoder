@@ -33,9 +33,7 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
     private ByteBuffer mBuffer;
     private boolean mIsEOS;
     private MediaFormat mActualOutputFormat;
-    private long mWrittenPresentationTimeUs;
     private long mOutputPresentationTimeExtractedUs;
-    private long mOutputPresentationTimeDecodedUs;
 
     public PassThroughTrackTranscoder(MediaExtractor extractor, int trackIndex,
                                       QueuedMuxer muxer, QueuedMuxer.SampleType sampleType) {
@@ -85,22 +83,14 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
         int flags = isKeyFrame ? MediaCodec.BUFFER_FLAG_SYNC_FRAME : 0;
         mBufferInfo.set(0, sampleSize, mExtractor.getSampleTime(), flags);
         mMuxer.writeSampleData(mSampleType, mBuffer, mBufferInfo);
-        mWrittenPresentationTimeUs = mBufferInfo.presentationTimeUs;
+        mOutputPresentationTimeExtractedUs = mBufferInfo.presentationTimeUs;
 
         mExtractor.advance();
         return true;
     }
 
     @Override
-    public long getWrittenPresentationTimeUs() {
-        return mWrittenPresentationTimeUs;
-    }
-
-    @Override
-    public long getOutputPresentationTimeExtractedUs() { return mOutputPresentationTimeExtractedUs; }
-
-    @Override
-    public long getOutputPresentationTimeDecodedUs() { return mOutputPresentationTimeDecodedUs; }
+    public long getOutputPresentationTimeDecodedUs() { return mOutputPresentationTimeExtractedUs; }
 
 
     @Override

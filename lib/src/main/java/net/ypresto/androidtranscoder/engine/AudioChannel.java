@@ -57,7 +57,9 @@ class AudioChannel {
     private final AudioBuffer mOverflowBuffer = new AudioBuffer();
 
     private MediaFormat mActualDecodedFormat;
-
+    
+    private ShortBuffer mEncoderBuffer;
+    private int mEncoderBufferIndex;
 
     public AudioChannel(final LinkedHashMap<String, MediaCodec> decoders,
                         final MediaCodec encoder, final MediaFormat encodeFormat) {
@@ -170,7 +172,7 @@ class AudioChannel {
      * @param timeoutUs
      * @return
      */
-    public boolean feedEncoder(long timeoutUs) {
+    public Long feedEncoder(long timeoutUs) {
 
         // Determine whether we have an overflow buffer or filled buffer to process
         final boolean hasOverflow = mOverflowBuffer.data != null && mOverflowBuffer.data.hasRemaining();
@@ -182,24 +184,28 @@ class AudioChannel {
         }
         if (isEmpty && !hasOverflow) {
             // No audio data - Bail out
-            return false;
+            return null;
         }
 
         // Get a buffer from the encoder that we can fill
-        final int encoderInBuffIndex = mEncoder.dequeueInputBuffer(timeoutUs);
-        if (encoderInBuffIndex < 0) {
-            // Encoder is full - Bail out
-            return false;
+        if (mEncoderBuffer == null) {
+           mEncoderBufferIndex = mEncoder.dequeueInputBuffer(timeoutUs);
+            if (mEncoderBufferIndex < 0) {
+                // Encoder is full - Bail out
+                return null;
+            }
+            mEncoderBuffer = mEncoderBuffers.getInputBuffer(mEncoderBufferIndex).asShortBuffer();
         }
 
         // Drain overflow first, just hand it over and we will process the rest next time
-        final ShortBuffer encoderBuffer = mEncoderBuffers.getInputBuffer(encoderInBuffIndex).asShortBuffer();
         if (hasOverflow) {
-            final long presentationTimeUs = drainOverflow(encoderBuffer);
-            mEncoder.queueInputBuffer(encoderInBuffIndex,
-                    0, encoderBuffer.position() * BYTES_PER_SHORT,
+            long presentationTimeUs = drainOverflow(mEncoderBuffer);
+            mEncoder.queueInputBuffer(mEncoderBufferIndex,
+                    0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                     presentationTimeUs, 0);
-            return true;
+            presentationTimeUs += sampleCountToDurationUs(mEncoderBuffer.position());
+            mEncoderBuffer = null;
+            return presentationTimeUs;
         }
 
         // Go through buffers by channel and mix it down into the encoder buffer
@@ -210,7 +216,7 @@ class AudioChannel {
             final AudioBuffer decoderBuffer = filledBuffers.poll();
             if (decoderBuffer.bufferIndex != BUFFER_INDEX_END_OF_STREAM) {
                 streamPresent = true;
-                long bufferPresentationTimeUs = remixAndMaybeFillOverflow(decoderBuffer, encoderBuffer);
+                long bufferPresentationTimeUs = remixAndMaybeFillOverflow(decoderBuffer, mEncoderBuffer);
                 if (presentationTimeUs == null)
                     presentationTimeUs = bufferPresentationTimeUs;
                 mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
@@ -218,25 +224,31 @@ class AudioChannel {
             }
         }
         if (!streamPresent) {
-            mEncoder.queueInputBuffer(encoderInBuffIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-            return false;
+            mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+            mEncoderBuffer = null;
+            return null;
         } else {
-            mEncoder.queueInputBuffer(encoderInBuffIndex,
-                    0, encoderBuffer.position() * BYTES_PER_SHORT,
-                    presentationTimeUs, 0);
-            return true;
+            if (mEncoderBuffer.limit() > 0) {
+                mEncoder.queueInputBuffer(mEncoderBufferIndex,
+                        0, mEncoderBuffer.position() * BYTES_PER_SHORT,
+                        presentationTimeUs, 0);
+                presentationTimeUs += sampleCountToDurationUs(mEncoderBuffer.position());
+                mEncoderBuffer = null;
+            } else
+                presentationTimeUs = -1l; // ignore it
+            return presentationTimeUs;
         }
     }
 
-    private static long sampleCountToDurationUs(final int sampleCount,
-                                                final int sampleRate,
-                                                final int channelCount) {
-        return (sampleCount / (sampleRate * MICROSECS_PER_SEC)) / channelCount;
+    private long sampleCountToDurationUs(final int sampleCount) {
+        int sampleRate = mInputSampleRate;
+        int channelCount = mInputChannelCount;
+        return  (MICROSECS_PER_SEC * sampleCount * channelCount + sampleRate - 1) / sampleRate;
     }
-    private static int DurationToSampleCount(final long duration,
-                                                final int sampleRate,
-                                                final int channelCount) {
-        Long samples = (duration * sampleRate * channelCount) / MICROSECS_PER_SEC;
+    private int durationToSampleCount(final long duration) {
+        int sampleRate = mInputSampleRate;
+        int channelCount = mInputChannelCount;
+        Long samples = ((duration * sampleRate * channelCount) + MICROSECS_PER_SEC - 1)/ MICROSECS_PER_SEC;
         return samples.intValue();
     }
 
@@ -251,7 +263,7 @@ class AudioChannel {
         final int overflowSize = overflowBuff.remaining();
 
         final long beginPresentationTimeUs = mOverflowBuffer.presentationTimeUs +
-                sampleCountToDurationUs(overflowBuff.position(), mInputSampleRate, mOutputChannelCount);
+                sampleCountToDurationUs(overflowBuff.position());
 
         outBuff.clear();
         // Limit overflowBuff to outBuff's capacity
@@ -282,25 +294,24 @@ class AudioChannel {
         final ShortBuffer inBuff = input.data;
         final ShortBuffer overflowBuff = mOverflowBuffer.data;
 
+        // Reset position to 0, and set limit to capacity (Since MediaCodec doesn't do that for us)
+        inBuff.clear();
         outBuff.clear();
 
         // Position buffer if needed to skip to start time
         int firstSample  = input.startTimeUs <= input.presentationTimeUs ? 0 :
-                DurationToSampleCount(input.startTimeUs - input.presentationTimeUs, mInputSampleRate, mOutputChannelCount);
-        int lastSample = input.endTimeUs == null ? inBuff.limit() :
-                Math.min(inBuff.limit(), DurationToSampleCount(input.endTimeUs - input.presentationTimeUs, mInputSampleRate, mOutputChannelCount));
+                durationToSampleCount(input.startTimeUs - input.presentationTimeUs);
+        int lastSample = input.endTimeUs == null  ||  input.endTimeUs > input.presentationTimeUs ? inBuff.limit() :
+                Math.max(0, durationToSampleCount(input.endTimeUs - input.presentationTimeUs));
 
         // Nothing to be processed cause we are skipping just return empty buffer
-        if (firstSample > inBuff.limit())
-            return input.presentationTimeUs + input.presentationTimeOffsetUs;
-        else {
+        if (firstSample >= inBuff.limit() || lastSample == 0) {
+            outBuff.limit(0);
+            return -1; // Buffer won't be sent to encoder because limit is zero
+        } else {
             inBuff.position(firstSample);
             inBuff.limit(lastSample);
         }
-
-
-        // Reset position to 0, and set limit to capacity (Since MediaCodec doesn't do that for us)
-        inBuff.clear();
 
         if (inBuff.remaining() > outBuff.remaining()) {
             // Overflow
@@ -310,11 +321,12 @@ class AudioChannel {
 
             // Reset limit to its own capacity & Keep position
             inBuff.limit(Math.min(inBuff.capacity(), lastSample));
+            //outBuff.flip();
 
             // Remix the rest onto overflowBuffer
             // NOTE: We should only reach this point when overflow buffer is empty
             final long consumedDurationUs =
-                    sampleCountToDurationUs(inBuff.position(), mInputSampleRate, mInputChannelCount);
+                    sampleCountToDurationUs(inBuff.position());
             mRemixer.remix(inBuff, overflowBuff);
 
             // Seal off overflowBuff & mark limit
@@ -324,8 +336,10 @@ class AudioChannel {
         } else {
             // No overflow
             mRemixer.remix(inBuff, outBuff);
+            //outBuff.flip();
         }
 
-        return input.presentationTimeUs + input.presentationTimeOffsetUs;
+        return Math.max(0, input.presentationTimeUs + input.presentationTimeOffsetUs +
+                sampleCountToDurationUs(firstSample));
     }
 }

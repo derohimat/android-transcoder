@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents the wiring for a time sequence in terms of input channels, output channels and filters
@@ -38,6 +39,7 @@ import java.util.List;
  */
 public class TimeLine {
 
+    static long TO_END_OF_FILE = -1;
     private List<Segment> mSegments = new ArrayList<Segment>();
     private LinkedHashMap<String, InputChannel> mChannels = new LinkedHashMap<String, InputChannel>();
     public TimeLine () {}
@@ -90,6 +92,17 @@ public class TimeLine {
         return this;
     }
 
+    /**
+     * Get the entire timeline duration
+     * @return
+     */
+    public Long getDuration () {
+        long durationUs = 0l;
+        for (Segment segment : getSegments()) {
+            durationUs += segment.getDuration();
+        }
+        return durationUs;
+    }
 
     /**
      * Represents a mapping of one or two input channels to an output channel, optionally
@@ -116,10 +129,12 @@ public class TimeLine {
      * An input file / start time combination
      */
     public class InputChannel {
+        public Long mLengthUs;  // Length based on metadata
         public Long mInputStartTimeUs = 0l;
+        public Long mInputEndTimeUs;
+        public Long mInputOffsetUs;
         public Long mPresentationAudioOutputTime;
         public Long mPresentationVideoOutputTime;
-        public Long mInputEndTimeUs;
         public ChannelType mChannelType;
         public FileDescriptor mInputFileDescriptor = null;
 
@@ -136,34 +151,30 @@ public class TimeLine {
         private TimeLine mTimeLine;
         private List<VideoPatch> mVideoPatches = new ArrayList<VideoPatch>();
         private HashMap<String, Long> mSeeks = new HashMap<String, Long>();
-        private HashMap<String, Long> mDurations = new HashMap<String, Long>();
-        private HashMap<String, InputChannel> mChannels = new HashMap<String, InputChannel>();
-        public Long mPresentationOutputTimeDecodedUs;
+        private Long mDuration;
+        private LinkedHashMap<String, InputChannel> mChannels = new LinkedHashMap<String, InputChannel>();
+        public Long mOutputStartTimeUs;
         public boolean isLastSegment = true;
 
-        public void start (Long presentationOutputTimeDecodedUs, Long presentationVideoOutputTime, Long presentationAudioOutputTime) {
+        public Long getDuration () {
+            if (mDuration != null)
+                return mDuration;
+            String firstChannelKey = mChannels.entrySet().iterator().next().getKey();
+            return mChannels.get(firstChannelKey).mLengthUs -
+                    (mSeeks.get(firstChannelKey) == null ? 0l : mSeeks.get(firstChannelKey));
+        }
 
-            mPresentationOutputTimeDecodedUs = presentationOutputTimeDecodedUs;
+        public void start (Long segmentStartTimeUs, Segment previousSegment) {
+
+            mOutputStartTimeUs = Math.max(segmentStartTimeUs, previousSegment == null ? 0 :
+                previousSegment.mOutputStartTimeUs + previousSegment.getDuration());
 
             for (HashMap.Entry<String, InputChannel> inputChannelEntry : mChannels.entrySet()) {
-
                 InputChannel inputChannel = inputChannelEntry.getValue();
-
-                inputChannel.mPresentationAudioOutputTime = presentationAudioOutputTime - inputChannel.mInputStartTimeUs;
-                inputChannel.mPresentationVideoOutputTime = presentationVideoOutputTime - inputChannel.mInputStartTimeUs;
-
-                // Update start time as long it is greater than current position
-                Long startTimeUs = mSeeks.get(inputChannelEntry.getKey());
-                if (startTimeUs != null) {
-                    inputChannel.mInputStartTimeUs = startTimeUs;
-                }
-
-                // Update duration and set channel duration to overridden duration or leave as null (end of stream)
-                Long durationUs = mDurations.get(inputChannelEntry.getKey());
-                if (durationUs != null) {
-                    inputChannel.mInputEndTimeUs = inputChannel.mInputStartTimeUs + durationUs;
-                } else
-                    inputChannel.mInputEndTimeUs = null;
+                String channelName = inputChannelEntry.getKey();
+                inputChannel.mInputStartTimeUs = mSeeks.get(channelName) != null ? mSeeks.get(channelName) : 0l;
+                inputChannel.mInputOffsetUs = mOutputStartTimeUs - inputChannel.mInputStartTimeUs;
+                inputChannel.mInputEndTimeUs = mDuration != null ? inputChannel.mInputStartTimeUs + mDuration : null;
             }
         }
         public TimeLine timeLine () {return mTimeLine;}
@@ -185,12 +196,11 @@ public class TimeLine {
 
         /**
          * Set the duration of the channel for this segment, otherwise to end of stream
-         * @param channel
          * @param time
          * @return
          */
-        public Segment duration(String channel, long time) {
-            this.mDurations.put(channel, time * 1000l);
+        public Segment duration(long time) {
+            this.mDuration = time * 1000l;
             return this;
         }
 

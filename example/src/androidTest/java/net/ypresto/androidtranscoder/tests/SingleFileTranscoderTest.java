@@ -95,12 +95,14 @@ public class SingleFileTranscoderTest {
                         .addChannel("A", in.getFileDescriptor())
                         .addChannel("B", in.getFileDescriptor())
                         .createSegment()
-                            .seek("A", 2000)
+                            .seek("A", 1000)
+                            .duration(1000)
                             .output("A")
-                            .timeLine()
-                        .createSegment()
+                        .timeLine().createSegment()
+                            .seek("B", 1000)
                             .output("B")
-                            .timeLine();
+                            .duration(1000)
+                        .timeLine();
                 (MediaTranscoder.getInstance().transcodeVideo(
                         timeline, outputFileName,
                         MediaFormatStrategyPresets.createAndroid720pStrategyMono(),

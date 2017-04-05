@@ -26,6 +26,7 @@ import net.ypresto.androidtranscoder.utils.MediaExtractorUtils;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,12 +42,17 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private class DecoderWrapper {
         private boolean mIsExtractorEOS;
         private boolean mIsDecoderEOS;
+        private boolean mIsSegmentEOS;
         private boolean mDecoderStarted;
         private MediaExtractor mExtractor;
         private MediaCodec mDecoder;
         private ByteBuffer [] mDecoderInputBuffers;
         private OutputSurface mOutputSurface;
         private Integer mTrackIndex;
+        private long mPresentationTimeDecodedUs = 0;
+        boolean mBufferRequeued;
+        int mResult;
+        private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
         DecoderWrapper(MediaExtractor mediaExtractor) {
             mExtractor = mediaExtractor;
         }
@@ -78,8 +84,17 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                 mDecoderInputBuffers = mDecoder.getInputBuffers();
             }
         }
+        private int dequeueOutputBuffer(long timeoutUs) {
+            if (!mBufferRequeued)
+                mResult = mDecoder.dequeueOutputBuffer(mBufferInfo, timeoutUs);
+            mBufferRequeued = false;
+            return mResult;
+        }
+        private void requeueOutputBuffer() {
+            mBufferRequeued = true;
+        }
 
-        public void release() {
+        private void release() {
             if (mOutputSurface != null) {
                 mOutputSurface.release();
                 mOutputSurface = null;
@@ -101,7 +116,6 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private final LinkedHashMap<String, MediaExtractor> mExtractors;
     private final MediaFormat mOutputFormat;
     private final QueuedMuxer mMuxer;
-    private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
     private MediaCodec mEncoder;
     private ByteBuffer[] mEncoderOutputBuffers;
     private MediaFormat mActualOutputFormat;
@@ -109,10 +123,14 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private boolean mIsEncoderEOS;
     private boolean mIsSegmentFinished;
     private boolean mEncoderStarted;
+    private long mOutputPresentationTimeToSyncToUs = 0l;
+    private String mChannelToSyncTo = "";
     private long mOutputPresentationTimeDecodedUs = 0l;
     private long mPreviousOutputPresentationTimeDecodedUs = 0l;
     private List <TextureRender> mTextureRender;
     private boolean mIsLastSegment = false;
+    private boolean mSeeking = false;
+    private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
 
     public VideoTrackTranscoder(LinkedHashMap<String, MediaExtractor> extractors,
                                 MediaFormat outputFormat, QueuedMuxer muxer) {
@@ -147,8 +165,18 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         Log.d(TAG, "Setting up Video Decoders for segment at " + segment.mOutputStartTimeUs + " for a duration of " + segment.getDuration());
 
         // Release any inactive decoders
+        Iterator<Map.Entry<String, VideoTrackTranscoder.DecoderWrapper>> iterator = mDecoderWrappers.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, VideoTrackTranscoder.DecoderWrapper> decoderWrapperEntry = iterator.next();
+            if (!segment.getAudioChannels().containsKey(decoderWrapperEntry.getKey())) {
+                decoderWrapperEntry.getValue().release();
+                iterator.remove();
+                Log.d(TAG, "Releasing Video Decoder " + decoderWrapperEntry.getKey());
+            }
+        }
+
         for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
-            if (!segment.getChannels().containsKey(decoderWrapperEntry.getKey())) {
+            if (!segment.getVideoChannels().containsKey(decoderWrapperEntry.getKey())) {
                 decoderWrapperEntry.getValue().release();
                 mDecoderWrappers.remove(decoderWrapperEntry.getKey());
                 Log.d(TAG, "Releasing Audio Decoder " + decoderWrapperEntry.getKey());
@@ -156,17 +184,20 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         }
 
         // Start any decoders being opened for the first time
-        for (Map.Entry<String, TimeLine.InputChannel> entry : segment.getChannels().entrySet()) {
-            DecoderWrapper decoderWrapper = mDecoderWrappers.get(entry.getKey());
-            if (decoderWrapper == null) {
-                decoderWrapper = new DecoderWrapper(mExtractors.get(entry.getKey()));
-                mDecoderWrappers.put(entry.getKey(), decoderWrapper);
-                Log.d(TAG, "Starting Audio Decoder " + entry.getKey() + " at offset " +entry.getValue().mInputOffsetUs + " starting at " + entry.getValue().mInputStartTimeUs + " ending at " + entry.getValue().mInputEndTimeUs);
 
+        for (Map.Entry<String, TimeLine.InputChannel> entry : segment.getVideoChannels().entrySet()) {
+            TimeLine.InputChannel inputChannel = entry.getValue();
+            String channelName = entry.getKey();
+            DecoderWrapper decoderWrapper = mDecoderWrappers.get(channelName);
+            if (decoderWrapper == null) {
+                decoderWrapper = new DecoderWrapper(mExtractors.get(channelName));
+                mDecoderWrappers.put(channelName, decoderWrapper);
             }
-            if (!decoderWrapper.mDecoderStarted) {
+            decoderWrapper.mIsSegmentEOS = false;
+            if (!decoderWrapper.mDecoderStarted)
                 decoderWrapper.start();
-            }
+            Log.d(TAG, "Video Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + (inputChannel.mInputStartTimeUs + inputChannel.mInputOffsetUs) + " ending at " + (inputChannel.mInputEndTimeUs == null ? "EOS" : inputChannel.mInputEndTimeUs + inputChannel.mInputOffsetUs));
+            mChannelToSyncTo = channelName;
         }
 
         // Create array of texture renderers for each patch in the segment
@@ -204,11 +235,28 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     }
 
 
+    @Override
     public long getOutputPresentationTimeDecodedUs() {
         return mOutputPresentationTimeDecodedUs;
     }
 
+    @Override
+    public long getSyncTimeUs () {
+        return mOutputPresentationTimeToSyncToUs;
+    }
+    @Override
+    public void setSyncTimeUs(long syncTimeUs) {
+        mOutputPresentationTimeToSyncToUs = syncTimeUs;
+    }
 
+    @Override
+    public String getSyncChannel () {
+        return mChannelToSyncTo;
+    }
+    @Override
+    public void setSyncChannel(String syncChannel) {
+        mChannelToSyncTo = syncChannel;
+    }
 
     @Override
     public boolean isSegmentFinished() {
@@ -258,16 +306,18 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
         boolean sampleProcessed = false;
 
-        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getChannels().entrySet()) {
+        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getVideoChannels().entrySet()) {
 
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
-            if (!decoderWrapper.mIsExtractorEOS /*&& inputChannelEntry.getValue().mPresentationVideoOutputTime <= mOutputPresentationTimeExtractedUs*/) {
+            if (!decoderWrapper.mIsExtractorEOS) {
 
                 // Find out which track the extractor has samples for next
                 int trackIndex = decoderWrapper.mExtractor.getSampleTrackIndex();
 
                 // Sample is for a different track (like audio) ignore
                 if (trackIndex >= 0 && trackIndex != decoderWrapper.mTrackIndex) {
+                    if (inputChannelEntry.getValue().mChannelType == TimeLine.ChannelType.AUDIO)
+                        decoderWrapper.mExtractor.advance(); // Skip video
                     continue;
                 }
 
@@ -305,19 +355,40 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private int drainDecoders(TimeLine.Segment segment, long timeoutUs) {
         boolean consumed = false;
         int textureCount = 0;
+        int channelCount = 0;
+        boolean seeking = false;
 
-        // Go through each decoder in the segment and get it's frame into a texture
-        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getChannels().entrySet()) {
-
-            TimeLine.InputChannel inputChannel = inputChannelEntry.getValue();
+        mSeeking = false;
+        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getVideoChannels().entrySet()) {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
+            if (inputChannelEntry.getValue().mInputStartTimeUs > decoderWrapper.mPresentationTimeDecodedUs)
+                mSeeking = true;
+        }
+
+            // Go through each decoder in the segment and get it's frame into a texture
+        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getVideoChannels().entrySet()) {
+
+            ++channelCount;
+            String channelName = inputChannelEntry.getKey();
+            TimeLine.InputChannel inputChannel = inputChannelEntry.getValue();
+            DecoderWrapper decoderWrapper = mDecoderWrappers.get(channelName);
 
             // Only process if we have not end end of stream for this decoder or extractor
-            if (!decoderWrapper.mIsDecoderEOS) {
+            if (!decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS) {
 
                 if (!decoderWrapper.mOutputSurface.isTextureReady() &&
                     !decoderWrapper.mOutputSurface.isEndOfInputStream()) {
-                    int result = decoderWrapper.mDecoder.dequeueOutputBuffer(mBufferInfo, timeoutUs);
+
+                    if (!mChannelToSyncTo.equals("") && !channelName.equals(mChannelToSyncTo) && mOutputPresentationTimeToSyncToUs < mOutputPresentationTimeDecodedUs) {
+                        Log.d(TAG, "Video Decoder " + inputChannelEntry.getKey() + " waiting on decoder " + mChannelToSyncTo + " " + mOutputPresentationTimeToSyncToUs + " <  " + mOutputPresentationTimeDecodedUs);
+                        continue;
+                    }
+
+                    // If seeking on some other track don't bother
+                    if (mSeeking && inputChannel.mInputStartTimeUs.equals(0l))
+                        continue;
+
+                    int result = decoderWrapper.dequeueOutputBuffer(timeoutUs);
                     switch (result) {
                         case MediaCodec.INFO_TRY_AGAIN_LATER:
                             continue;
@@ -326,53 +397,66 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
                     }
                     consumed = true;
-                    if ((mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                        mBufferInfo.size = 0;
+                    long frameLength = mOutputPresentationTimeDecodedUs - mPreviousOutputPresentationTimeDecodedUs;
+
+                    // See if encoder is end-of-stream and propogage to output surface
+                    if ((decoderWrapper.mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        decoderWrapper.mBufferInfo.size = 0;
                         decoderWrapper.mOutputSurface.signalEndOfInputStream();
                         decoderWrapper.mIsDecoderEOS = true;
+                        segment.forceEndOfStream(mOutputPresentationTimeDecodedUs + 1);
+                        Log.d(TAG, "End of Stream video " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
                     }
-                    boolean isDecoderEndOfStream = true;
-                    for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
-                        if (!decoderWrapperEntry.getValue().mIsDecoderEOS)
-                            isDecoderEndOfStream = false;
-                    }
-                    boolean doRender = (mBufferInfo.size > 0);
+
+                    boolean doRender = (decoderWrapper.mBufferInfo.size > 0);
                     // NOTE: doRender will block if buffer (of encoder) is full.
                     // Refer: http://bigflake.com/mediacodec/CameraToMpegTest.java.txt
 
                     // Decide how to render
                     if (doRender && inputChannel.mInputEndTimeUs != null &&
-                        mBufferInfo.presentationTimeUs >= inputChannel.mInputEndTimeUs) {
+                            decoderWrapper.mBufferInfo.presentationTimeUs >= inputChannel.mInputEndTimeUs) {
                         // Past end point - signal end of stream
-                        decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
-                        isDecoderEndOfStream = true;
-                    } else if (doRender && mBufferInfo.presentationTimeUs >= inputChannel.mInputStartTimeUs) {
+                        decoderWrapper.requeueOutputBuffer();
+                        decoderWrapper.mIsSegmentEOS = true;
+                        Log.d(TAG, "End of Segment video " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
+                    } else if (doRender && decoderWrapper.mBufferInfo.presentationTimeUs >= inputChannel.mInputStartTimeUs) {
                         // Within range get image into texture for rendering
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, true);
                         decoderWrapper.mOutputSurface.awaitNewImage();
                         decoderWrapper.mOutputSurface.setTextureReady();
                         ++textureCount;
                         consumed = true;
-                        long frameLength = mOutputPresentationTimeDecodedUs - mPreviousOutputPresentationTimeDecodedUs;
-                        mOutputPresentationTimeDecodedUs = mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs + frameLength;
-                        mPreviousOutputPresentationTimeDecodedUs = mOutputPresentationTimeDecodedUs;
-                        Log.d(TAG, "Encoded video " + mOutputPresentationTimeDecodedUs);
+                        mOutputPresentationTimeDecodedUs = Math.max(decoderWrapper.mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs + frameLength, mOutputPresentationTimeDecodedUs);
+                        if (channelName.equals(mChannelToSyncTo))
+                            mOutputPresentationTimeToSyncToUs = mOutputPresentationTimeDecodedUs;
+                        else if (mOutputPresentationTimeDecodedUs < mOutputPresentationTimeToSyncToUs) {
+                            mOutputPresentationTimeToSyncToUs = mOutputPresentationTimeDecodedUs;
+                            mChannelToSyncTo = channelName;
+                        }
+                        decoderWrapper.mPresentationTimeDecodedUs = decoderWrapper.mBufferInfo.presentationTimeUs;
+                        inputChannel.mInputAcutalEndTimeUs = decoderWrapper.mBufferInfo.presentationTimeUs + frameLength;
+                        Log.d(TAG, "Encoded video " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
                     } else {
                         // Seeking - release it without rendering
+                        Log.d(TAG, "Skipping video " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
+                        inputChannel.mInputAcutalEndTimeUs = decoderWrapper.mBufferInfo.presentationTimeUs + frameLength;
+                        seeking = true;
                     }
-                    if (isDecoderEndOfStream) {
-                        if (mIsLastSegment && !mIsSegmentFinished)
-                            mEncoder.signalEndOfInputStream();
-                        mIsSegmentFinished = true;
-                    }
-
+                    mPreviousOutputPresentationTimeDecodedUs = mOutputPresentationTimeDecodedUs;
                 }
             }
         }
+        if (allDecodersEndOfStream()) {
+            if (mIsLastSegment && !mIsSegmentFinished)
+                mEncoder.signalEndOfInputStream();
+            mIsSegmentFinished = true;
+        }
+
+        mSeeking = seeking;
 
         // If all textures have been accumulated draw the image and send it to the encoder
-        if (textureCount >= segment.getChannelCount()) {
+        if (textureCount >= channelCount) {
 
             for (TextureRender textureRender : mTextureRender) {
                 textureRender.drawFrame();
@@ -386,6 +470,14 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         return consumed ? DRAIN_STATE_CONSUMED : DRAIN_STATE_NONE;
     }
 
+    boolean allDecodersEndOfStream () {
+        boolean isDecoderEndOfStream = true;
+        for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
+            if (!(decoderWrapperEntry.getValue().mIsDecoderEOS || decoderWrapperEntry.getValue().mIsSegmentEOS))
+                isDecoderEndOfStream = false;
+        }
+        return isDecoderEndOfStream;
+    }
 
     private int drainEncoder(long timeoutUs) {
         if (mIsEncoderEOS) return DRAIN_STATE_NONE;

@@ -34,6 +34,8 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
     private boolean mIsEOS;
     private MediaFormat mActualOutputFormat;
     private long mOutputPresentationTimeExtractedUs;
+    private long mOutputPresentationTimeToSyncToUs = 0l;
+    private String mChannelToSyncToUs = "";
 
     public PassThroughTrackTranscoder(MediaExtractor extractor, int trackIndex,
                                       QueuedMuxer muxer, QueuedMuxer.SampleType sampleType) {
@@ -92,7 +94,22 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
     @Override
     public long getOutputPresentationTimeDecodedUs() { return mOutputPresentationTimeExtractedUs; }
 
-
+    @Override
+    public void setSyncTimeUs(long syncTimeUs) {
+        mOutputPresentationTimeToSyncToUs = syncTimeUs;
+    }
+    @Override
+    public long getSyncTimeUs () {
+        return mOutputPresentationTimeToSyncToUs;
+    }
+    @Override
+    public String getSyncChannel () {
+        return mChannelToSyncToUs;
+    }
+    @Override
+    public void setSyncChannel(String syncChannel) {
+        mChannelToSyncToUs = syncChannel;
+    }
     @Override
     public boolean isSegmentFinished() {
         return mIsEOS;

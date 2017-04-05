@@ -2,6 +2,7 @@ package net.ypresto.androidtranscoder.engine;
 
 import android.media.MediaCodec;
 import android.media.MediaFormat;
+import android.util.Log;
 
 import net.ypresto.androidtranscoder.compat.MediaCodecBufferCompatWrapper;
 
@@ -30,7 +31,7 @@ class AudioChannel {
         Long presentationTimeOffsetUs;
         ShortBuffer data;
     }
-
+    private static final String TAG = "AudioChannel";
     public static final int BUFFER_INDEX_END_OF_STREAM = -1;
 
     private static final int BYTES_PER_SHORT = 2;
@@ -81,6 +82,19 @@ class AudioChannel {
         mEncoderBuffers = new MediaCodecBufferCompatWrapper(mEncoder);
     }
 
+    public AudioChannel createFromExisting(final LinkedHashMap<String, MediaCodec> decoders,
+                                           final MediaCodec encoder, final MediaFormat encodeFormat) {
+
+        AudioChannel audioChannel = new AudioChannel(decoders, encoder, encodeFormat);
+        for (Map.Entry<String, MediaCodecBufferCompatWrapper> entry : audioChannel.mDecoderBuffers.entrySet()) {
+            if (mDecoderBuffers.containsKey(entry.getKey()))
+                audioChannel.mDecoderBuffers.put(entry.getKey(), mDecoderBuffers.get(entry.getKey()));
+        }
+        audioChannel.setActualDecodedFormat(getDeterminedFormat());
+
+        return audioChannel;
+    }
+
     public void setActualDecodedFormat(final MediaFormat decodedFormat) {
         mActualDecodedFormat = decodedFormat;
 
@@ -115,6 +129,22 @@ class AudioChannel {
         return mActualDecodedFormat;
     }
 
+    public long getBufferDurationUs(String input, final int bufferIndex) {
+        // Grab the buffer from the decoder
+        MediaCodecBufferCompatWrapper decoderBuffer = mDecoderBuffers.get(input);
+        if (mActualDecodedFormat == null) {
+            throw new RuntimeException("Buffer received before format!");
+        }
+
+        // Get actual decoded data
+        final ByteBuffer data =
+                bufferIndex == BUFFER_INDEX_END_OF_STREAM ?
+                        null : decoderBuffer.getOutputBuffer(bufferIndex);
+
+        return data == null ? 0l : sampleCountToDurationUs(data.limit());
+
+    }
+
     /**
      * Take the data from a decoder buffer and queue it up to later be fed to the encoder.
      * @param input - channel
@@ -138,7 +168,7 @@ class AudioChannel {
                 bufferIndex == BUFFER_INDEX_END_OF_STREAM ?
                         null : decoderBuffer.getOutputBuffer(bufferIndex);
 
-        // Grab and empty buffer (recycled) or create a new one
+        // Grab an empty buffer (recycled) or create a new one
         AudioBuffer buffer = mEmptyBuffers.get(input).poll();
         if (buffer == null) {
             buffer = new AudioBuffer();
@@ -176,13 +206,13 @@ class AudioChannel {
 
         // Determine whether we have an overflow buffer or filled buffer to process
         final boolean hasOverflow = mOverflowBuffer.data != null && mOverflowBuffer.data.hasRemaining();
-        boolean isEmpty = true;
+        boolean isFilled = true;
         for (Map.Entry<String, Queue<AudioBuffer>> entry : mFilledBuffers.entrySet()) {
-            if (!entry.getValue().isEmpty()) {
-                isEmpty = false;
+            if (entry.getValue().isEmpty()) {
+                isFilled = false;
             }
         }
-        if (isEmpty && !hasOverflow) {
+        if (!isFilled && !hasOverflow) {
             // No audio data - Bail out
             return null;
         }
@@ -203,6 +233,7 @@ class AudioChannel {
             mEncoder.queueInputBuffer(mEncoderBufferIndex,
                     0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                     presentationTimeUs, 0);
+            Log.d(TAG, "Submitting audio overflow buffer at " + presentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
             presentationTimeUs += sampleCountToDurationUs(mEncoderBuffer.position());
             mEncoderBuffer = null;
             return presentationTimeUs;
@@ -217,7 +248,7 @@ class AudioChannel {
             if (decoderBuffer.bufferIndex != BUFFER_INDEX_END_OF_STREAM) {
                 streamPresent = true;
                 long bufferPresentationTimeUs = remixAndMaybeFillOverflow(decoderBuffer, mEncoderBuffer);
-                if (presentationTimeUs == null)
+                if (presentationTimeUs == null || presentationTimeUs.equals(-1l))
                     presentationTimeUs = bufferPresentationTimeUs;
                 mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
                 mEmptyBuffers.get(entry.getKey()).add(decoderBuffer);
@@ -232,6 +263,7 @@ class AudioChannel {
                 mEncoder.queueInputBuffer(mEncoderBufferIndex,
                         0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                         presentationTimeUs, 0);
+                Log.d(TAG, "Submitting audio buffer at " + presentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
                 presentationTimeUs += sampleCountToDurationUs(mEncoderBuffer.position());
                 mEncoderBuffer = null;
             } else
@@ -240,10 +272,10 @@ class AudioChannel {
         }
     }
 
-    private long sampleCountToDurationUs(final int sampleCount) {
+    public long sampleCountToDurationUs(final int sampleCount) {
         int sampleRate = mInputSampleRate;
         int channelCount = mInputChannelCount;
-        return  (MICROSECS_PER_SEC * sampleCount * channelCount + sampleRate - 1) / sampleRate;
+        return  (MICROSECS_PER_SEC * sampleCount / channelCount + sampleRate - 1) / sampleRate;
     }
     private int durationToSampleCount(final long duration) {
         int sampleRate = mInputSampleRate;
@@ -297,6 +329,8 @@ class AudioChannel {
         // Reset position to 0, and set limit to capacity (Since MediaCodec doesn't do that for us)
         inBuff.clear();
         outBuff.clear();
+
+        Log.d(TAG, "remixing buffer at " + (input.presentationTimeUs + input.presentationTimeOffsetUs));
 
         // Position buffer if needed to skip to start time
         int firstSample  = input.startTimeUs <= input.presentationTimeUs ? 0 :

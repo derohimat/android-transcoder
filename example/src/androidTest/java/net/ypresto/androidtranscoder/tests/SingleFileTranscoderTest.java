@@ -27,7 +27,8 @@ import static org.junit.Assert.assertEquals;
 @RunWith(AndroidJUnit4.class)
 public class SingleFileTranscoderTest {
     private static final String TAG = "JUnitTranscoder";
-    private String inputFileName;
+    private String inputFileName1;
+    private String inputFileName2;
     private String outputFileName;
     private String status = "not started";
 
@@ -54,13 +55,24 @@ public class SingleFileTranscoderTest {
 
     @Before
     public void retrieveVideo ()  {
-        inputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input.mp4";
+        inputFileName1 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input1.mp4";
+        inputFileName2 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input2.mp4";
         outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output.mp4";
-        cleanup(inputFileName);
+        cleanup(inputFileName1);
+        cleanup(inputFileName2);
         cleanup(outputFileName);
         try {
-            InputStream in = InstrumentationRegistry.getContext().getResources().openRawResource(net.ypresto.androidtranscoder.example.test.R.raw.sample);
-            OutputStream out = new FileOutputStream(inputFileName);
+            InputStream in = InstrumentationRegistry.getContext().getResources().openRawResource(net.ypresto.androidtranscoder.example.test.R.raw.poolcleaner);
+            OutputStream out = new FileOutputStream(inputFileName1);
+            copyFile(in, out);
+            in.close();
+            out.close();
+        } catch(IOException e) {
+            assertEquals("Exception on file copy", "none", e + Log.getStackTraceString(e));
+        }
+        try {
+            InputStream in = InstrumentationRegistry.getContext().getResources().openRawResource(net.ypresto.androidtranscoder.example.test.R.raw.frogs);
+            OutputStream out = new FileOutputStream(inputFileName2);
             copyFile(in, out);
             in.close();
             out.close();
@@ -90,18 +102,26 @@ public class SingleFileTranscoderTest {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
-                ParcelFileDescriptor in = ParcelFileDescriptor.open(new File(inputFileName), ParcelFileDescriptor.MODE_READ_ONLY);
+                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+                ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File(inputFileName2), ParcelFileDescriptor.MODE_READ_ONLY);
                 TimeLine timeline = new TimeLine()
-                        .addChannel("A", in.getFileDescriptor())
-                        .addChannel("B", in.getFileDescriptor())
+                        .addChannel("A", in1.getFileDescriptor())
+                        .addChannel("B", in1.getFileDescriptor())
+                        .addChannel("C", in1.getFileDescriptor())
+                        .addAudioOnlyChannel("D", in2.getFileDescriptor())
                         .createSegment()
+                            .output("C")
+                            .output("D")
+                        .timeLine().createSegment()
                             .seek("A", 1000)
-                            .duration(1000)
+                            .duration(1500)
                             .output("A")
+                            .output("D")
                         .timeLine().createSegment()
                             .seek("B", 1000)
                             .output("B")
-                            .duration(1000)
+                            .duration(1500)
+                            .output("D")
                         .timeLine();
                 (MediaTranscoder.getInstance().transcodeVideo(
                         timeline, outputFileName,

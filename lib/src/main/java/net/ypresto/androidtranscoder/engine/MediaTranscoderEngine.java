@@ -46,9 +46,7 @@ public class MediaTranscoderEngine {
     private volatile double mProgress;
     private ProgressCallback mProgressCallback;
     private long mDurationUs;
-    private long mVideoOutputPresentationTimeExtractedUs = 0l;
-    private long mAudioOutputPresentationTimeExtractedUs = 0l;
-    private long mOutputPresentationTimeDecodedUs = 0l;
+
     /**
      * Do not use this constructor unless you know what you are doing.
      */
@@ -162,7 +160,6 @@ public class MediaTranscoderEngine {
         MediaFormat videoOutputFormat = null;
         MediaFormat audioOutputFormat = null;
         MediaExtractorUtils.TrackResult trackResult = null;
-        mDurationUs = timeLine.getDuration();
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : timeLine.getChannels().entrySet()) {
 
             TimeLine.InputChannel inputChannel = inputChannelEntry.getValue();
@@ -203,6 +200,7 @@ public class MediaTranscoderEngine {
                 }
             }
         }
+        mDurationUs = timeLine.getDuration();
         if (videoOutputFormat == null && audioOutputFormat == null) {
             throw new InvalidOutputFormatException("MediaFormatStrategy returned pass-through for both video and audio. No transcoding is necessary.");
         }
@@ -233,6 +231,8 @@ public class MediaTranscoderEngine {
 
     private void runPipelines(TimeLine timeLine) throws IOException {
         long loopCount = 0;
+        long outputPresentationTimeDecodedUs = 0l;
+        long outputSyncTimeUs = 0l;
         if (mDurationUs <= 0) {
             double progress = PROGRESS_UNKNOWN;
             mProgress = progress;
@@ -241,15 +241,26 @@ public class MediaTranscoderEngine {
         }
         TimeLine.Segment prevousSegment = null;
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
-            outputSegment.start(mOutputPresentationTimeDecodedUs, prevousSegment);
+            outputSegment.start(outputPresentationTimeDecodedUs, prevousSegment);
             prevousSegment = outputSegment;
             mAudioTrackTranscoder.setupDecoders(outputSegment);
             mVideoTrackTranscoder.setupDecoders(outputSegment);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
+
+                // Set lowest sync time
+                if (mVideoTrackTranscoder.getSyncTimeUs() < mAudioTrackTranscoder.getSyncTimeUs()) {
+                    mVideoTrackTranscoder.setSyncTimeUs(mAudioTrackTranscoder.getSyncTimeUs());
+                    mVideoTrackTranscoder.setSyncChannel(mAudioTrackTranscoder.getSyncChannel());
+                } else {
+                    mAudioTrackTranscoder.setSyncTimeUs(mVideoTrackTranscoder.getSyncTimeUs());
+                    mAudioTrackTranscoder.setSyncChannel(mVideoTrackTranscoder.getSyncChannel());
+                }
+
                 boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment) || mAudioTrackTranscoder.stepPipeline(outputSegment);
-                mOutputPresentationTimeDecodedUs = Math.max(mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(),
+                outputPresentationTimeDecodedUs = Math.max(mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(),
                     mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
                 loopCount++;
+
                 if (mDurationUs > 0 && loopCount % PROGRESS_INTERVAL_STEPS == 0) {
                     double videoProgress = mVideoTrackTranscoder.isSegmentFinished() ? 1.0 : Math.min(1.0, (double) mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs() / mDurationUs);
                     double audioProgress = mAudioTrackTranscoder.isSegmentFinished() ? 1.0 : Math.min(1.0, (double) mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs() / mDurationUs);
@@ -257,6 +268,7 @@ public class MediaTranscoderEngine {
                     mProgress = progress;
                     if (mProgressCallback != null) mProgressCallback.onProgress(progress);
                 }
+
                 if (!stepped) {
                     try {
                         Thread.sleep(SLEEP_TO_WAIT_TRACK_TRANSCODERS);

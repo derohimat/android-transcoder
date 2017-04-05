@@ -4,7 +4,7 @@ import java.nio.ShortBuffer;
 
 public class AudioRemixer {
 
-    void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff) {};
+    void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append) {};
 
     static final int SIGNED_SHORT_LIMIT = 32768;
     static final int UNSIGNED_SHORT_MAX = 65535;
@@ -34,15 +34,14 @@ public class AudioRemixer {
     static AudioRemixer DOWNMIX = new AudioRemixer() {
 
         @Override
-        public void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff) {
+        public void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append) {
             // Down-mix stereo to mono
             final int inRemaining = inSBuff.remaining() / 2;
             final int outSpace = outSBuff.remaining();
             final int samplesToBeProcessed = Math.min(inRemaining, outSpace);
 
-            if (outSBuff.position() > 0) {
+            if (append) {
                 ShortBuffer outSBuffCopy = outSBuff.asReadOnlyBuffer();
-                outSBuffCopy.rewind();
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned
                     final int aLeft = inSBuff.get();
@@ -52,7 +51,6 @@ public class AudioRemixer {
                     outSBuff.put(mix(mix(aLeft, bLeft), mix(aRight, bRight)));
                 }
             } else {
-
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned
                     final int a = inSBuff.get();
@@ -65,15 +63,14 @@ public class AudioRemixer {
 
     static AudioRemixer UPMIX = new AudioRemixer() {
         @Override
-        public void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff) {
+        public void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append) {
             // Up-mix mono to stereo
             final int inRemaining = inSBuff.remaining();
             final int outSpace = outSBuff.remaining() / 2;
 
             final int samplesToBeProcessed = Math.min(inRemaining, outSpace);
-            if (outSBuff.position() > 0) {
+            if (append) {
                 ShortBuffer outSBuffCopy = outSBuff.asReadOnlyBuffer();
-                outSBuffCopy.rewind();
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned
                     final int a = inSBuff.get();
@@ -94,14 +91,12 @@ public class AudioRemixer {
 
     static AudioRemixer PASSTHROUGH = new AudioRemixer() {
         @Override
-        public void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff) {
+        public void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append) {
 
-            if (outSBuff.position() > 0) {
+            if (append) {
                 ShortBuffer outSBuffCopy = outSBuff.asReadOnlyBuffer();
-                outSBuffCopy.rewind();
                 final int inRemaining = inSBuff.remaining();
                 final int outSpace = outSBuff.remaining();
-
                 final int samplesToBeProcessed = Math.min(inRemaining, outSpace);
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned

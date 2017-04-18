@@ -27,7 +27,7 @@ public interface TrackTranscoder {
 
     /**
      * Get actual MediaFormat which is used to write to muxer.
-     * To determine you should call {@link #stepPipeline()} several times.
+     * To determine you should call stepPipeline() several times.
      *
      * @return Actual output format determined by coder, or {@code null} if not yet determined.
      */

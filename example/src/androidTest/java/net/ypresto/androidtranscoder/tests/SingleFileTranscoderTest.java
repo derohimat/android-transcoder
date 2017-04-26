@@ -8,6 +8,8 @@ import android.util.Log;
 
 import net.ypresto.androidtranscoder.MediaTranscoder;
 import net.ypresto.androidtranscoder.engine.TimeLine;
+import net.ypresto.androidtranscoder.format.Android16By9FormatStrategy;
+import net.ypresto.androidtranscoder.format.Android720pFormatStrategy;
 import net.ypresto.androidtranscoder.format.MediaFormatStrategyPresets;
 
 
@@ -125,7 +127,7 @@ public class SingleFileTranscoderTest {
                         .timeLine();
                 (MediaTranscoder.getInstance().transcodeVideo(
                         timeline, outputFileName,
-                        MediaFormatStrategyPresets.createAndroid720pStrategyMono(),
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy1080P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, 1),
                         listener)
                 ).get();
 

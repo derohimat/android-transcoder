@@ -78,12 +78,12 @@ public class MediaTranscoder {
     public Future<Void> transcodeVideo(final FileDescriptor inFileDescriptor, final String outPath, final Listener listener) {
         return transcodeVideo(inFileDescriptor, outPath, new MediaFormatStrategy() {
             @Override
-            public MediaFormat createVideoOutputFormat(MediaFormat inputFormat) {
+            public MediaFormat createVideoOutputFormat(MediaFormat inputFormat, boolean allowPassthru) {
                 return MediaFormatPresets.getExportPreset960x540();
             }
 
             @Override
-            public MediaFormat createAudioOutputFormat(MediaFormat inputFormat) {
+            public MediaFormat createAudioOutputFormat(MediaFormat inputFormat, boolean allowPassthru) {
                 return null;
             }
         }, listener);

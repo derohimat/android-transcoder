@@ -160,6 +160,7 @@ public class MediaTranscoderEngine {
         MediaFormat videoOutputFormat = null;
         MediaFormat audioOutputFormat = null;
         MediaExtractorUtils.TrackResult trackResult = null;
+        boolean allowPassthru = timeLine.getChannels().size() == 1;
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : timeLine.getChannels().entrySet()) {
 
             TimeLine.InputChannel inputChannel = inputChannelEntry.getValue();
@@ -178,7 +179,7 @@ public class MediaTranscoderEngine {
                 mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
                 mExtractor.put(channelName, mediaExtractor);
                 if (videoOutputFormat == null) {
-                    videoOutputFormat = formatStrategy.createVideoOutputFormat(trackResult.mVideoTrackFormat);
+                    videoOutputFormat = formatStrategy.createVideoOutputFormat(trackResult.mVideoTrackFormat, allowPassthru);
                     mFirstFileDescriptorWithVideo = fileDescriptor;
                 }
                 MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
@@ -196,7 +197,7 @@ public class MediaTranscoderEngine {
                 mediaExtractor.selectTrack(trackResult.mAudioTrackIndex);
                 mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
                 if (audioOutputFormat == null) {
-                    audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat);
+                    audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat, allowPassthru);
                 }
             }
         }

@@ -17,17 +17,17 @@ import java.util.Map;
  *      .addChannel("movie3", fd2)
  *      .addChannel("soundtrack", fd3)
  *      .createSegment()
- *          .duration("movie1", 60000)
+ *          .duration(60000)
  *          .audio("soundtrack")
  *          .output("movie1", Filter.SEPIA)
  *      .timeLine().createSegment()
- *          .duration("movie1", 2000)
+ *          .duration(2000)
  *          .seek("movie2", 1000)
  *          .combineAndPipe("movie1", "movie2", Filter.CROSSFADE, "temp")
  *          .audio("soundtrack")
  *          .output("temp", Filter.SEPIA)
  *      .timeLine().createSegment()
- *          .trim(2000)
+*           .duration("4000")
  *          .audio("soundtrack")
  *          .output("movie2")
  *      .timeLine().createSegment(1000)
@@ -222,7 +222,7 @@ public class TimeLine {
          * Get all channels that participate in this segment
          * @return
          */
-        public HashMap<String, InputChannel> getChannels() {
+        public LinkedHashMap<String, InputChannel> getChannels() {
              return mChannels;
         }
 

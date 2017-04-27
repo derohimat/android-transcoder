@@ -96,7 +96,7 @@ public class AudioRemixer {
             if (append) {
                 ShortBuffer outSBuffCopy = outSBuff.asReadOnlyBuffer();
                 final int inRemaining = inSBuff.remaining();
-                final int outSpace = outSBuff.remaining();
+                final int outSpace = outSBuff.remaining() / 2;
                 final int samplesToBeProcessed = Math.min(inRemaining, outSpace);
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned

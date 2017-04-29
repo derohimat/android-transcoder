@@ -32,7 +32,7 @@ public class SingleFileTranscoderTest {
     private String inputFileName1;
     private String inputFileName2;
     private String outputFileName;
-    private String status = "not started";
+    private volatile String status = "not started";
 
     MediaTranscoder.Listener listener = new MediaTranscoder.Listener() {
         @Override
@@ -82,24 +82,7 @@ public class SingleFileTranscoderTest {
             assertEquals("Exception on file copy", "none", e + Log.getStackTraceString(e));
         }
     }
-/*
-    @Test
-    public void TranscodeToMono() {
-        runTest(new Transcode() {
-            @Override
-            public void run() throws IOException, InterruptedException, ExecutionException {
-                ParcelFileDescriptor in = ParcelFileDescriptor.open(new File(inputFileName), ParcelFileDescriptor.MODE_READ_ONLY);
-                (MediaTranscoder.getInstance().transcodeVideo(
-                    in.getFileDescriptor(), outputFileName,
-                    MediaFormatStrategyPresets.createAndroid720pStrategyMono(),
-                    listener)
-                ).get();
-
-            }
-        });
-    }
-    */
-    @Test
+    @Test()
     public void TranscodeTwoFiles() {
         runTest(new Transcode() {
             @Override
@@ -114,8 +97,12 @@ public class SingleFileTranscoderTest {
                         .createSegment()
                             .output("C")
                             .output("D")
+                            .duration(1000)
                         .timeLine().createSegment()
-                            .seek("A", 1000)
+                            .combineAndOutput("C", "A", TimeLine.Filter.CROSS_FADE)
+                            .output("D")
+                            .duration(2000)
+                        .timeLine().createSegment()
                             .duration(1500)
                             .output("A")
                             .output("D")
@@ -130,7 +117,6 @@ public class SingleFileTranscoderTest {
                         MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
                         listener)
                 ).get();
-
             }
         });
     }

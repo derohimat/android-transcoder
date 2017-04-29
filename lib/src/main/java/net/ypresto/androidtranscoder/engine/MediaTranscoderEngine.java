@@ -41,7 +41,8 @@ public class MediaTranscoderEngine {
     private FileDescriptor mFirstFileDescriptorWithVideo;
     private TrackTranscoder mVideoTrackTranscoder;
     private TrackTranscoder mAudioTrackTranscoder;
-    private LinkedHashMap<String, MediaExtractor> mExtractor;
+    private LinkedHashMap<String, MediaExtractor> mVideoExtractor;
+    private LinkedHashMap<String, MediaExtractor> mAudioExtractor;
     private MediaMuxer mMuxer;
     private volatile double mProgress;
     private ProgressCallback mProgressCallback;
@@ -51,7 +52,8 @@ public class MediaTranscoderEngine {
      * Do not use this constructor unless you know what you are doing.
      */
     public MediaTranscoderEngine() {
-        mExtractor = new LinkedHashMap<String, MediaExtractor>();
+        mAudioExtractor = new LinkedHashMap<String, MediaExtractor>();
+        mVideoExtractor = new LinkedHashMap<String, MediaExtractor>();
     }
 
     public ProgressCallback getProgressCallback() {
@@ -105,7 +107,10 @@ public class MediaTranscoderEngine {
                     //mAudioTrackTranscoder.release();
                     mAudioTrackTranscoder = null;
                 }
-                for (Map.Entry<String, MediaExtractor> entry : mExtractor.entrySet()) {
+                for (Map.Entry<String, MediaExtractor> entry : mAudioExtractor.entrySet()) {
+                    entry.getValue().release();
+                }
+                for (Map.Entry<String, MediaExtractor> entry : mVideoExtractor.entrySet()) {
                     entry.getValue().release();
                 }
             } catch (RuntimeException e) {
@@ -165,39 +170,50 @@ public class MediaTranscoderEngine {
 
             TimeLine.InputChannel inputChannel = inputChannelEntry.getValue();
             String channelName = inputChannelEntry.getKey();
-
             FileDescriptor fileDescriptor = inputChannel.mInputFileDescriptor;
-            MediaExtractor mediaExtractor = new MediaExtractor();
-            try {
-                mediaExtractor.setDataSource(fileDescriptor);
-            } catch (IOException e) {
-                Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
-                throw e;
-            }
-            trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(mediaExtractor);
-            if (trackResult.mVideoTrackFormat != null) {
-                mediaExtractor.selectTrack(trackResult.mVideoTrackIndex);
-                mExtractor.put(channelName, mediaExtractor);
-                if (videoOutputFormat == null) {
-                    videoOutputFormat = formatStrategy.createVideoOutputFormat(trackResult.mVideoTrackFormat, allowPassthru);
-                    mFirstFileDescriptorWithVideo = fileDescriptor;
-                }
-                MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
-                mediaMetadataRetriever.setDataSource(fileDescriptor);
-                Long duration;
+            if (inputChannel.mChannelType == TimeLine.ChannelType.VIDEO || inputChannel.mChannelType == TimeLine.ChannelType.BOTH) {
+                MediaExtractor videoExtractor = new MediaExtractor();
                 try {
-                    duration = Long.parseLong(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)) * 1000;
-                } catch (NumberFormatException e) {
-                    duration = -1l;
+                    videoExtractor.setDataSource(fileDescriptor);
+                } catch (IOException e) {
+                    Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
+                    throw e;
                 }
-                Log.d(TAG, "Duration of " + channelName + ": (us): " + duration);
-                inputChannelEntry.getValue().mLengthUs = duration;
+                trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(videoExtractor);
+                if (trackResult.mVideoTrackFormat != null) {
+                    videoExtractor.selectTrack(trackResult.mVideoTrackIndex);
+                    mVideoExtractor.put(channelName, videoExtractor);
+                    if (videoOutputFormat == null) {
+                        videoOutputFormat = formatStrategy.createVideoOutputFormat(trackResult.mVideoTrackFormat, allowPassthru);
+                        mFirstFileDescriptorWithVideo = fileDescriptor;
+                    }
+                    MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
+                    mediaMetadataRetriever.setDataSource(fileDescriptor);
+                    Long duration;
+                    try {
+                        duration = Long.parseLong(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)) * 1000;
+                    } catch (NumberFormatException e) {
+                        duration = -1l;
+                    }
+                    Log.d(TAG, "Duration of " + channelName + ": (us): " + duration);
+                    inputChannelEntry.getValue().mLengthUs = duration;
+                }
             }
-            if (trackResult.mAudioTrackFormat != null) {
-                mediaExtractor.selectTrack(trackResult.mAudioTrackIndex);
-                mExtractor.put(inputChannelEntry.getKey(), mediaExtractor);
-                if (audioOutputFormat == null) {
-                    audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat, allowPassthru);
+            if (inputChannel.mChannelType == TimeLine.ChannelType.AUDIO || inputChannel.mChannelType == TimeLine.ChannelType.BOTH) {
+                MediaExtractor audioExtractor = new MediaExtractor();
+                try {
+                    audioExtractor.setDataSource(fileDescriptor);
+                } catch (IOException e) {
+                    Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
+                    throw e;
+                }
+                trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(audioExtractor);
+                if (trackResult.mAudioTrackFormat != null) {
+                    audioExtractor.selectTrack(trackResult.mAudioTrackIndex);
+                    mAudioExtractor.put(inputChannelEntry.getKey(), audioExtractor);
+                    if (audioOutputFormat == null) {
+                        audioOutputFormat = formatStrategy.createAudioOutputFormat(trackResult.mAudioTrackFormat, allowPassthru);
+                    }
                 }
             }
         }
@@ -214,18 +230,18 @@ public class MediaTranscoderEngine {
         });
 
         if (videoOutputFormat == null && trackResult != null) {
-            mVideoTrackTranscoder = new PassThroughTrackTranscoder(mExtractor.entrySet().iterator().next().getValue(),
+            mVideoTrackTranscoder = new PassThroughTrackTranscoder(mVideoExtractor.entrySet().iterator().next().getValue(),
                     trackResult.mVideoTrackIndex, queuedMuxer, QueuedMuxer.SampleType.VIDEO);
         } else {
-            mVideoTrackTranscoder = new VideoTrackTranscoder(mExtractor, videoOutputFormat, queuedMuxer);
+            mVideoTrackTranscoder = new VideoTrackTranscoder(mVideoExtractor, videoOutputFormat, queuedMuxer);
         }
         mVideoTrackTranscoder.setupEncoder();
 
         if (audioOutputFormat == null) {
-            mAudioTrackTranscoder = new PassThroughTrackTranscoder(mExtractor.entrySet().iterator().next().getValue(),
+            mAudioTrackTranscoder = new PassThroughTrackTranscoder(mAudioExtractor.entrySet().iterator().next().getValue(),
                     trackResult.mAudioTrackIndex, queuedMuxer, QueuedMuxer.SampleType.AUDIO);
         } else {
-            mAudioTrackTranscoder = new AudioTrackTranscoder(mExtractor,  audioOutputFormat, queuedMuxer);
+            mAudioTrackTranscoder = new AudioTrackTranscoder(mAudioExtractor,  audioOutputFormat, queuedMuxer);
         }
         mAudioTrackTranscoder.setupEncoder();
     }

@@ -26,6 +26,7 @@ import android.util.Log;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.util.List;
 
 /**
  * Code for rendering a texture onto a surface using OpenGL ES 2.0.
@@ -60,14 +61,18 @@ class TextureRender {
                     "varying vec2 vTextureCoord;\n" +
                     "uniform samplerExternalOES sTexture1;\n" +
                     "uniform samplerExternalOES sTexture2;\n" +
-                    "uniform float uAlpha;\n" +
+                    "uniform samplerExternalOES sTexture3;\n" +
+                    "uniform samplerExternalOES sTexture4;\n" +
+                    "uniform float uAlpha1;\n" +
+                    "uniform float uAlpha2;\n" +
+                    "uniform float uAlpha3;\n" +
+                    "uniform float uAlpha4;\n" +
                     "void main() {\n" +
-                    "  if (uAlpha == 0.00) {\n" +
-                    "      gl_FragColor = texture2D(sTexture2, vTextureCoord);\n" +
-                    "  } else {\n" +
-                    "      vec4 f1 = texture2D(sTexture1, vTextureCoord);\n" +
-                    "      vec4 f2 = texture2D(sTexture2, vTextureCoord);\n" +
-                    "      gl_FragColor = mix(f1, f2, uAlpha);\n" +
+                    "  if (uAlpha1 >= 0.00) {\n" +
+                    "      gl_FragColor = texture2D(sTexture1, vTextureCoord) * uAlpha1;\n" +
+                    "  }\n" +
+                    "  if (uAlpha2 >= 0.00) {\n" +
+                    "      gl_FragColor += texture2D(sTexture2, vTextureCoord) * uAlpha2;\n" +
                     "  }\n" +
                     "}\n";
     private float[] mMVPMatrix = new float[16];
@@ -77,15 +82,14 @@ class TextureRender {
     private int muSTMatrixHandle;
     private int maPositionHandle;
     private int maTextureHandle;
-    private int muTexture1;
-    private int muTexture2;
-    private int muAlpha;
-    private OutputSurface mOutputSurface1;
-    private OutputSurface mOutputSurface2;
+    private int [] muTextures = new int[4];
+    private int [] muAlphas = new int[4];
+    List<OutputSurface> mOutputSurfaces;
+    static int mGLESTextures [] = {GLES20.GL_TEXTURE0, GLES20.GL_TEXTURE1, GLES20.GL_TEXTURE2, GLES20.GL_TEXTURE3, GLES20.GL_TEXTURE4};
 
-    public TextureRender(OutputSurface outputSurface1, OutputSurface outputSurface2) {
-        mOutputSurface1 = outputSurface1;
-        mOutputSurface2 = outputSurface2;
+
+    public TextureRender(List<OutputSurface> outputSurfaces) {
+        mOutputSurfaces = outputSurfaces;
         mTriangleVertices = ByteBuffer.allocateDirect(
                 mTriangleVerticesData.length * FLOAT_SIZE_BYTES)
                 .order(ByteOrder.nativeOrder()).asFloatBuffer();
@@ -95,26 +99,21 @@ class TextureRender {
 
     public void drawFrame() {
 
-        float alpha = 0f;
         checkGlError("onDrawFrame start");
-        mOutputSurface1.getSurfaceTexture().getTransformMatrix(mSTMatrix);
+
+        mOutputSurfaces.get(0).getSurfaceTexture().getTransformMatrix(mSTMatrix);
         GLES20.glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
         GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
         GLES20.glUseProgram(mProgram);
         checkGlError("glUseProgram");
 
-        GLES20.glUniform1f(muAlpha, 0.5f);
-
-        GLES20.glUniform1i(muTexture1, 0);
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mOutputSurface1.getTextureID());
-
-        if (mOutputSurface2 != null) {
-            GLES20.glUniform1i(muTexture2, 1);
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE1);
-            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mOutputSurface2.getTextureID());
-            alpha = 0.5f;
+        for (int textureIndex = 0; textureIndex < mOutputSurfaces.size(); ++textureIndex) {
+            GLES20.glUniform1i(muTextures[textureIndex], textureIndex);
+            GLES20.glActiveTexture(mGLESTextures[textureIndex]);
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mOutputSurfaces.get(textureIndex).getTextureID());
+            GLES20.glUniform1f(muAlphas[textureIndex], mOutputSurfaces.get(textureIndex).getAlpha());
         }
+
         mTriangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET);
         GLES20.glVertexAttribPointer(maPositionHandle, 3, GLES20.GL_FLOAT, false,
                 TRIANGLE_VERTICES_DATA_STRIDE_BYTES, mTriangleVertices);
@@ -136,9 +135,10 @@ class TextureRender {
         checkGlError("glDrawArrays");
         GLES20.glFinish();
 
-        mOutputSurface1.clearTextureReady();
-        if(mOutputSurface2 != null)
-            mOutputSurface2.clearTextureReady();
+        for (int textureIndex = 0; textureIndex < mOutputSurfaces.size(); ++textureIndex) {
+            mOutputSurfaces.get(textureIndex).clearTextureReady();
+        }
+
     }
     /**
      * Initializes GL state.  Call this after the EGL surface has been created and made current.
@@ -168,37 +168,24 @@ class TextureRender {
         if (muSTMatrixHandle == -1) {
             throw new RuntimeException("Could not get attrib location for uSTMatrix");
         }
-        muTexture1 = GLES20.glGetUniformLocation(mProgram, "sTexture1");
-        checkGlError("glGetUniformLocation sTexture1");
-        if (muTexture1 == -1) {
-            throw new RuntimeException("Could not get attrib location for sTexture1");
+        for (int textureIndex = 0; textureIndex < mOutputSurfaces.size(); ++textureIndex) {
+            muTextures[textureIndex] = GLES20.glGetUniformLocation(mProgram, "sTexture" + (textureIndex + 1));
+            checkGlError("glGetUniformLocation sTexture");
+            if (muTextures[textureIndex] == -1) {
+                throw new RuntimeException("Could not get attrib location for sTexture" + (textureIndex + 1));
+            }
         }
-        muTexture2 = GLES20.glGetUniformLocation(mProgram, "sTexture2");
-        checkGlError("glGetUniformLocation sTexture2");
-        if (muTexture2 == -1) {
-            throw new RuntimeException("Could not get attrib location for sTexture2");
+        for (int textureIndex = 0; textureIndex < mOutputSurfaces.size(); ++textureIndex) {
+            muAlphas[textureIndex] = GLES20.glGetUniformLocation(mProgram, "uAlpha" + (textureIndex + 1));
+            checkGlError("glGetUniformLocation uALpha");
+            if (muTextures[textureIndex] == -1) {
+                throw new RuntimeException("Could not get attrib location for uAlpha" + (textureIndex + 1));
+            }
         }
-        muAlpha = GLES20.glGetUniformLocation(mProgram, "uAlpha");
-        checkGlError("glGetUniformLocation uAlpha");
-        if (muAlpha == -1) {
-            throw new RuntimeException("Could not get attrib location for uAlpha");
-        }
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mOutputSurface1.getTextureID());
-        checkGlError("glBindTexture inTexture1");
-        GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER,
-                GLES20.GL_LINEAR);
-        GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER,
-                GLES20.GL_LINEAR);
-        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S,
-                GLES20.GL_CLAMP_TO_EDGE);
-        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T,
-                GLES20.GL_CLAMP_TO_EDGE);
-        checkGlError("glTexParameter");
 
-        if (mOutputSurface2 != null) {
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE1);
-            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mOutputSurface2.getTextureID());
+        for (int textureIndex = 0; textureIndex < mOutputSurfaces.size(); ++textureIndex) {
+            GLES20.glActiveTexture(mGLESTextures[textureIndex]);
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mOutputSurfaces.get(textureIndex).getTextureID());
             checkGlError("glBindTexture inTexture1");
             GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER,
                     GLES20.GL_LINEAR);
@@ -210,6 +197,7 @@ class TextureRender {
                     GLES20.GL_CLAMP_TO_EDGE);
             checkGlError("glTexParameter");
         }
+
     }
 
     private int loadShader(int shaderType, String source) {

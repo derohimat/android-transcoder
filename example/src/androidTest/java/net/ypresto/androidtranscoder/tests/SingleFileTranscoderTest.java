@@ -43,6 +43,7 @@ public class SingleFileTranscoderTest {
         public void onTranscodeCompleted() {
             Log.d(TAG, "Complete");
             status = "complete";
+            Log.d(TAG, "Status set to Complete");
         }
         @Override
         public void onTranscodeCanceled() {
@@ -99,7 +100,8 @@ public class SingleFileTranscoderTest {
                             .output("D")
                             .duration(1000)
                         .timeLine().createSegment()
-                            .combineAndOutput("C", "A", TimeLine.Filter.CROSS_FADE)
+                            .output("C", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                            .output("A", TimeLine.Filter.OPACITY_UP_RAMP)
                             .output("D")
                             .duration(2000)
                         .timeLine().createSegment()

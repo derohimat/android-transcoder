@@ -83,6 +83,23 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                 mDecoderInputBuffers = mDecoder.getInputBuffers();
             }
         }
+        private float mPresentationTimeus;
+        private float mDurationUs;
+        private TimeLine.Filter mFilter;
+        private void setFilter(TimeLine.Filter filter, long presentationTimeUs, long durationUs) {
+            mFilter = filter;
+            mPresentationTimeus = presentationTimeUs;
+            mDurationUs = durationUs;
+
+        }
+        private void filterTick (float presentationTimeUs) {
+            if (mFilter == TimeLine.Filter.OPACITY_UP_RAMP) {
+                mOutputSurface.setAlpha((presentationTimeUs - mPresentationTimeus) / mDurationUs);
+            }
+            if (mFilter == TimeLine.Filter.OPACITY_DOWN_RAMP) {
+                mOutputSurface.setAlpha(1.0f - (presentationTimeUs - mPresentationTimeus) / mDurationUs);
+            }
+        }
         private int dequeueOutputBuffer(long timeoutUs) {
             if (!mBufferRequeued)
                 mResult = mDecoder.dequeueOutputBuffer(mBufferInfo, timeoutUs);
@@ -202,15 +219,17 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
         // Create array of texture renderers for each patch in the segment
         mTextureRender = new ArrayList<TextureRender>();
+        ArrayList<OutputSurface> outputSurfaces = new ArrayList<OutputSurface>(2);
         for (TimeLine.VideoPatch videoPatch : segment.getVideoPatches()) {
-            OutputSurface surface1 = mDecoderWrappers.get(videoPatch.mInput1).mOutputSurface;
-            OutputSurface surface2 = videoPatch.mInput2 != null ? mDecoderWrappers.get(videoPatch.mInput2).mOutputSurface : null;
-            TextureRender textureRender = new TextureRender(surface1, surface2);
-            textureRender.surfaceCreated();
-            mTextureRender.add(textureRender);
-            Log.d(TAG, "Surface Texture Created " + videoPatch.mInput1 + (videoPatch.mInput2 != null ? " and " + videoPatch.mInput2 : ""));
-            mTextures = videoPatch.mInput2 != null ? 2 : 1;
+            DecoderWrapper decoderWrapper = mDecoderWrappers.get(videoPatch.mInput);
+            outputSurfaces.add(decoderWrapper.mOutputSurface);
+            decoderWrapper.setFilter(videoPatch.mFilter, mOutputPresentationTimeDecodedUs, segment.getDuration());
         }
+        TextureRender textureRender = new TextureRender(outputSurfaces);
+        textureRender.surfaceCreated();
+        mTextureRender.add(textureRender);
+        Log.d(TAG, "Surface Texture Created for " + segment.getVideoPatches().size() + " surfaces");
+        mTextures = segment.getVideoPatches().size();
         mIsSegmentFinished = false;
         mIsEncoderEOS = false;
         mIsLastSegment = segment.isLastSegment;
@@ -415,6 +434,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, true);
                         decoderWrapper.mOutputSurface.awaitNewImage();
                         decoderWrapper.mOutputSurface.setTextureReady();
+                        decoderWrapper.filterTick(mOutputPresentationTimeDecodedUs);
                         ++mTexturesReady;
                         consumed = true;
                         mOutputPresentationTimeDecodedUs = Math.max(decoderWrapper.mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs + frameLength, mOutputPresentationTimeDecodedUs);

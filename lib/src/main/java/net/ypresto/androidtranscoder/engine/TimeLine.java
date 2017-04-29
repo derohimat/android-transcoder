@@ -134,20 +134,17 @@ public class TimeLine {
      * applying a filter.
      */
     public class VideoPatch {
-        public String mInput1;
-        public String mInput2;
+        public String mInput;
         public String mOutput;
         public Filter mFilter;
 
-        VideoPatch(String input1, String input2, String output, Filter filter) {
-            mInput1 = input1;
-            mInput2 = input2;
-            mOutput = output;
+        VideoPatch(String input, Filter filter) {
+            mInput = input;
             mFilter = filter;
         }
     }
 
-    public enum Filter {CHROMA_KEY, CROSS_FADE, SEPIA};
+    public enum Filter {CHROMA_KEY, OPACITY_UP_RAMP, OPACITY_DOWN_RAMP, SEPIA};
     public enum ChannelType {VIDEO, AUDIO, BOTH}
 
     /**
@@ -284,7 +281,7 @@ public class TimeLine {
          * @param inputChannel
          */
         public Segment audio(String inputChannel) {
-            mVideoPatches.add(new VideoPatch(inputChannel, null, null, null));
+            mVideoPatches.add(new VideoPatch(inputChannel, null));
             mChannels.put(inputChannel, TimeLine.this.mChannels.get(inputChannel));
             return this;
         }
@@ -298,7 +295,7 @@ public class TimeLine {
         public Segment output(String inputChannelName) {
             InputChannel inputChannel = TimeLine.this.mChannels.get(inputChannelName);
             if (inputChannel.mChannelType != ChannelType.AUDIO)
-                mVideoPatches.add(new VideoPatch(inputChannelName, null, null, null));
+                mVideoPatches.add(new VideoPatch(inputChannelName, null));
             mChannels.put(inputChannelName, inputChannel);
             return this;
         }
@@ -309,39 +306,11 @@ public class TimeLine {
          * @param inputChannel
          */
         public Segment output(String inputChannel, Filter filter) {
-            mVideoPatches.add(new VideoPatch(inputChannel, null, null, filter));
+            mVideoPatches.add(new VideoPatch(inputChannel, filter));
             mChannels.put(inputChannel, TimeLine.this.mChannels.get(inputChannel));
             return this;
         }
 
-        /**
-         * Add a mapping of input stream(s) to an outputChannel stream, optionally via a filter.
-         *
-         * @param inputChannel1
-         * @param inputChannel2
-         * @param filter
-         */
-        public Segment combineAndOutput(String inputChannel1, String inputChannel2, Filter filter) {
-            mVideoPatches.add(new VideoPatch(inputChannel1, inputChannel2, null, filter));
-            mChannels.put(inputChannel1, TimeLine.this.mChannels.get(inputChannel1));
-            mChannels.put(inputChannel2, TimeLine.this.mChannels.get(inputChannel2));
-            return this;
-        }
-
-        /**
-         * Add a mapping of input stream(s) to an outputChannel stream, optionally via a filter.
-         *
-         * @param inputChannel1
-         * @param inputChannel2
-         * @param outputChannel
-         * @param filter
-         */
-        public Segment combineAndPipe(String inputChannel1, String inputChannel2, String outputChannel, Filter filter) {
-            mVideoPatches.add(new VideoPatch(inputChannel1, inputChannel2, outputChannel, filter));
-            mChannels.put(inputChannel1, TimeLine.this.mChannels.get(inputChannel1));
-            mChannels.put(inputChannel2, TimeLine.this.mChannels.get(inputChannel2));
-            return this;
-        }
 
         int getChannelCount() {
             return mVideoPatches.size();

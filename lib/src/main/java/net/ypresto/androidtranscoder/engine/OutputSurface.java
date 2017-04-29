@@ -55,6 +55,7 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private boolean mTextureReady = false;
     private boolean mEndOfStream;
     private int mTextureID = -12345;
+    private float mAlpha = 1.0f;
     /**
      * Creates an OutputSurface backed by a pbuffer with the specifed dimensions.  The new
      * EGL context and surface will be made current.  Creates a Surface that can be passed
@@ -204,6 +205,11 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     }
     public void setTextureReady() { mTextureReady = true;}
     public void clearTextureReady() { mTextureReady = false;}
+
+    public float getAlpha () {return  mAlpha;}
+    public void setAlpha(float alpha) {
+        mAlpha = alpha;
+    }
     /**
      * Latches the next buffer into the texture.  Must be called from the thread that created
      * the OutputSurface object, after the onFrameAvailable callback has signaled that new

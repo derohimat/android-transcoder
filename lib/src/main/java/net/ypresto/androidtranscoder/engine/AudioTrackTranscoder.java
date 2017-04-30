@@ -20,6 +20,7 @@ import static net.ypresto.androidtranscoder.engine.AudioChannel.BUFFER_INDEX_END
 public class AudioTrackTranscoder implements TrackTranscoder {
     private static final String TAG = "AudioTrackTranscoder";
     private static final QueuedMuxer.SampleType SAMPLE_TYPE = QueuedMuxer.SampleType.AUDIO;
+    private static final long BUFFER_LEAD_TIME = 100000; // Amount we will let other decoders get ahead
 
     private static final int DRAIN_STATE_NONE = 0;
     private static final int DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY = 1;
@@ -71,7 +72,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         private MediaCodecBufferCompatWrapper mDecoderInputBuffers;
         private MediaCodec mDecoder;
         private Integer mTrackIndex;
-        private long mPresentationTimeDecodedUs = 0;
         boolean mBufferRequeued;
         int mResult;
         private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
@@ -288,6 +288,9 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                         return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
                 }
                 consumed = true;
+                long bufferInputStartTime = decoderWrapper.mBufferInfo.presentationTimeUs;
+                long bufferInputEndTime = bufferInputStartTime + mAudioChannel.getBufferDurationUs(channelName, result);
+                long bufferOutputTime = bufferInputStartTime + inputChannel.mInputOffsetUs;
 
                 // End of stream - requeue the buffer
                 if ((decoderWrapper.mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -300,34 +303,27 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
                 // Process a buffer with data
                 } else if (decoderWrapper.mBufferInfo.size > 0) {
-                    long endOfBufferTimeUs = decoderWrapper.mBufferInfo.presentationTimeUs +
-                         mAudioChannel.getBufferDurationUs(channelName, result);
 
                     // If we are before start skip entirely
-                    if (endOfBufferTimeUs < inputChannel.mInputStartTimeUs) {
-                        inputChannel.mInputAcutalEndTimeUs = decoderWrapper.mBufferInfo.presentationTimeUs + mAudioChannel.getBufferDurationUs(channelName, result);
-                        if (inputChannel.mInputEndTimeUs != null)
-                            inputChannel.mInputAcutalEndTimeUs = Math.min(inputChannel.mInputEndTimeUs, inputChannel.mInputAcutalEndTimeUs);
+                    if (bufferInputStartTime < inputChannel.mInputStartTimeUs) {
+                        inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
-                        Log.d(TAG, "Skipping Audio for Decoder " + channelName + " at " + (decoderWrapper.mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs) + " end of buffer " + (endOfBufferTimeUs + inputChannel.mInputOffsetUs));
-                        mOutputPresentationTimeToSyncToUs = Math.max(mOutputPresentationTimeDecodedUs + 100000, mOutputPresentationTimeToSyncToUs);
+                        Log.d(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
+                        mOutputPresentationTimeToSyncToUs = Math.max(bufferOutputTime + BUFFER_LEAD_TIME, mOutputPresentationTimeToSyncToUs);
 
                     // Requeue buffer if to far ahead of other tracks
-                    } else if ((decoderWrapper.mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs) > mOutputPresentationTimeToSyncToUs) {
+                    } else if (bufferOutputTime > mOutputPresentationTimeToSyncToUs) {
                         decoderWrapper.requeueOutputBuffer();
-                        Log.d(TAG, "Requeue Audio Buffer because " + decoderWrapper.mBufferInfo.presentationTimeUs + " > " + mOutputPresentationTimeToSyncToUs + " for decoder " + channelName);
+                        Log.d(TAG, "Requeue Audio Buffer " + bufferOutputTime + " > " + mOutputPresentationTimeToSyncToUs + " for decoder " + channelName);
                         consumed = false;
 
                     // Submit buffer for audio mixing
                     } else {
-                        Log.d(TAG, "Submitting Audio for Decoder " + channelName + " at " + (decoderWrapper.mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs));
-                        inputChannel.mInputAcutalEndTimeUs = decoderWrapper.mBufferInfo.presentationTimeUs + mAudioChannel.getBufferDurationUs(channelName, result);
-                        if (inputChannel.mInputEndTimeUs != null)
-                            inputChannel.mInputAcutalEndTimeUs = Math.min(inputChannel.mInputEndTimeUs, inputChannel.mInputAcutalEndTimeUs);
+                        Log.d(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
+                        inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs, inputChannel.mInputOffsetUs, inputChannel.mInputStartTimeUs, inputChannel.mInputEndTimeUs);
-                        mOutputPresentationTimeToSyncToUs = Math.max(mOutputPresentationTimeDecodedUs + 100000, mOutputPresentationTimeToSyncToUs);
+                        mOutputPresentationTimeToSyncToUs = Math.max(bufferOutputTime + BUFFER_LEAD_TIME, mOutputPresentationTimeToSyncToUs);;
                     }
-                    decoderWrapper.mPresentationTimeDecodedUs = decoderWrapper.mBufferInfo.presentationTimeUs;
                 }
             }
         }

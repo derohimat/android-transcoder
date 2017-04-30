@@ -103,7 +103,7 @@ public class SingleFileTranscoderTest {
                             .output("C", TimeLine.Filter.OPACITY_DOWN_RAMP)
                             .output("A", TimeLine.Filter.OPACITY_UP_RAMP)
                             .output("D")
-                            .duration(2000)
+                            .duration(3000)
                         .timeLine().createSegment()
                             .duration(1500)
                             .output("A")

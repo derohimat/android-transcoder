@@ -171,7 +171,7 @@ public class MediaTranscoderEngine {
             TimeLine.InputChannel inputChannel = inputChannelEntry.getValue();
             String channelName = inputChannelEntry.getKey();
             FileDescriptor fileDescriptor = inputChannel.mInputFileDescriptor;
-            if (inputChannel.mChannelType == TimeLine.ChannelType.VIDEO || inputChannel.mChannelType == TimeLine.ChannelType.BOTH) {
+            if (inputChannel.mChannelType == TimeLine.ChannelType.VIDEO || inputChannel.mChannelType == TimeLine.ChannelType.AUDIO_VIDEO) {
                 MediaExtractor videoExtractor = new MediaExtractor();
                 try {
                     videoExtractor.setDataSource(fileDescriptor);
@@ -199,7 +199,7 @@ public class MediaTranscoderEngine {
                     inputChannelEntry.getValue().mLengthUs = duration;
                 }
             }
-            if (inputChannel.mChannelType == TimeLine.ChannelType.AUDIO || inputChannel.mChannelType == TimeLine.ChannelType.BOTH) {
+            if (inputChannel.mChannelType == TimeLine.ChannelType.AUDIO || inputChannel.mChannelType == TimeLine.ChannelType.AUDIO_VIDEO) {
                 MediaExtractor audioExtractor = new MediaExtractor();
                 try {
                     audioExtractor.setDataSource(fileDescriptor);

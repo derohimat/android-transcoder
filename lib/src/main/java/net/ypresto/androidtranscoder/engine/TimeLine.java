@@ -1,7 +1,6 @@
 package net.ypresto.androidtranscoder.engine;
 
 import java.io.FileDescriptor;
-import java.nio.channels.Channel;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
@@ -42,7 +41,7 @@ public class TimeLine {
 
     static long TO_END_OF_FILE = -1;
     private List<Segment> mSegments = new ArrayList<Segment>();
-    private LinkedHashMap<String, InputChannel> mChannels = new LinkedHashMap<String, InputChannel>();
+    private LinkedHashMap<String, InputChannel> mTimeLineChannels = new LinkedHashMap<String, InputChannel>();
     public TimeLine () {}
 
     public Segment createSegment() {
@@ -65,7 +64,7 @@ public class TimeLine {
      * Get a List of all channels used for creating the master list of extractors
      * @return
      */
-    public  LinkedHashMap<String, InputChannel> getChannels() {return mChannels;}
+    public  LinkedHashMap<String, InputChannel> getChannels() {return mTimeLineChannels;}
 
 
     /**
@@ -76,7 +75,7 @@ public class TimeLine {
      * @return
      */
     public TimeLine addChannel(String inputChannel, FileDescriptor inputFileDescriptor) {
-        mChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.BOTH));
+        mTimeLineChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.AUDIO_VIDEO));
         return this;
     }
 
@@ -88,7 +87,7 @@ public class TimeLine {
      * @return
      */
     public TimeLine addVideoOnlyChannel(String inputChannel, FileDescriptor inputFileDescriptor) {
-        mChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.VIDEO));
+        mTimeLineChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.VIDEO));
         return this;
     }
 
@@ -100,7 +99,7 @@ public class TimeLine {
      * @return
      */
     public TimeLine addAudioOnlyChannel(String inputChannel, FileDescriptor inputFileDescriptor) {
-        mChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.AUDIO));
+        mTimeLineChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.AUDIO));
         return this;
     }
 
@@ -113,7 +112,7 @@ public class TimeLine {
      * @return
      */
     public TimeLine addChannel(String inputChannel, FileDescriptor inputFileDescriptor, ChannelType channelType) {
-        mChannels.put(inputChannel, new InputChannel(inputFileDescriptor, channelType));
+        mTimeLineChannels.put(inputChannel, new InputChannel(inputFileDescriptor, channelType));
         return this;
     }
 
@@ -133,19 +132,18 @@ public class TimeLine {
      * Represents a mapping of one or two input channels to an output channel, optionally
      * applying a filter.
      */
-    public class VideoPatch {
-        public String mInput;
-        public String mOutput;
+    public class SegmentChannel {
+        public InputChannel mChannel;
         public Filter mFilter;
 
-        VideoPatch(String input, Filter filter) {
-            mInput = input;
+        SegmentChannel(InputChannel input, Filter filter) {
+            mChannel = input;
             mFilter = filter;
         }
     }
 
-    public enum Filter {CHROMA_KEY, OPACITY_UP_RAMP, OPACITY_DOWN_RAMP, SEPIA};
-    public enum ChannelType {VIDEO, AUDIO, BOTH}
+    public enum Filter {OPACITY_UP_RAMP, OPACITY_DOWN_RAMP};
+    public enum ChannelType {VIDEO, AUDIO, AUDIO_VIDEO, IMAGE}
 
     /**
      * An input file / start time combination
@@ -170,19 +168,19 @@ public class TimeLine {
 
     public class Segment {
         private TimeLine mTimeLine;
-        private List<VideoPatch> mVideoPatches = new ArrayList<VideoPatch>();
+        private LinkedHashMap<String, SegmentChannel> mSegmentChannels = new LinkedHashMap();
         private HashMap<String, Long> mSeeks = new HashMap<String, Long>();
         private Long mDuration;
-        private LinkedHashMap<String, InputChannel> mChannels = new LinkedHashMap<String, InputChannel>();
         public Long mOutputStartTimeUs;
         public boolean isLastSegment = true;
 
         public Long getDuration () {
             if (mDuration != null)
                 return mDuration;
-            String firstChannelKey = mChannels.entrySet().iterator().next().getKey();
-            return mChannels.get(firstChannelKey).mLengthUs -
-                    (mSeeks.get(firstChannelKey) == null ? 0l : mSeeks.get(firstChannelKey));
+
+            HashMap.Entry<String, SegmentChannel> firstChannelEntry = mSegmentChannels.entrySet().iterator().next();
+            return firstChannelEntry.getValue().mChannel.mLengthUs -
+                    (mSeeks.get(firstChannelEntry.getKey()) == null ? 0l : mSeeks.get(firstChannelEntry.getKey()));
         }
 
         public void start (Long segmentStartTimeUs, Segment previousSegment) {
@@ -190,11 +188,12 @@ public class TimeLine {
             mOutputStartTimeUs = Math.max(segmentStartTimeUs, previousSegment == null ? 0 :
                 previousSegment.mOutputStartTimeUs + previousSegment.getDuration());
 
-            for (HashMap.Entry<String, InputChannel> inputChannelEntry : mChannels.entrySet()) {
-                InputChannel inputChannel = inputChannelEntry.getValue();
-                String channelName = inputChannelEntry.getKey();
-                if (previousSegment != null && previousSegment.mChannels.containsKey(channelName)) {
-                    InputChannel previousChannel = previousSegment.mChannels.get(channelName);
+            for (HashMap.Entry<String, SegmentChannel> segmentChannelEntry : mSegmentChannels.entrySet()) {
+                SegmentChannel segmentChannel = segmentChannelEntry.getValue();
+                String channelName = segmentChannelEntry.getKey();
+                InputChannel inputChannel = segmentChannel.mChannel;
+                if (previousSegment != null && previousSegment.mSegmentChannels.containsKey(channelName)) {
+                    InputChannel previousChannel = mTimeLine.mTimeLineChannels.get(channelName);
                     inputChannel.mInputStartTimeUs = mSeeks.get(channelName) != null ?
                             mSeeks.get(channelName) + previousChannel.mInputAcutalEndTimeUs : previousChannel.mInputAcutalEndTimeUs;
                 } else {
@@ -207,8 +206,8 @@ public class TimeLine {
         }
 
         public void forceEndOfStream(long outputPresentationTime) {
-            for (HashMap.Entry<String, InputChannel> inputChannelEntry : mChannels.entrySet()) {
-                InputChannel inputChannel = inputChannelEntry.getValue();
+            for (HashMap.Entry<String, SegmentChannel> segmentChannelEntry : mSegmentChannels.entrySet()) {
+                InputChannel inputChannel = segmentChannelEntry.getValue().mChannel;
                 inputChannel.mInputEndTimeUs = outputPresentationTime - inputChannel.mInputOffsetUs;
             }
         }
@@ -220,7 +219,22 @@ public class TimeLine {
          * @return
          */
         public LinkedHashMap<String, InputChannel> getChannels() {
-             return mChannels;
+            LinkedHashMap<String, InputChannel> channels = new LinkedHashMap<String, InputChannel>();
+            for (Map.Entry<String, TimeLine.SegmentChannel> entry : mSegmentChannels.entrySet())
+                channels.put(entry.getKey(), entry.getValue().mChannel);
+            return channels;
+        }
+
+        /**
+         * Get all video channels that participate in this segment
+         * @return
+         */
+        public LinkedHashMap<String, InputChannel> getImageChannels() {
+            LinkedHashMap<String, InputChannel> channels = new LinkedHashMap<String, InputChannel>();
+            for (Map.Entry<String, TimeLine.SegmentChannel> entry : mSegmentChannels.entrySet())
+                if (entry.getValue().mChannel.mChannelType == ChannelType.IMAGE)
+                    channels.put(entry.getKey(), entry.getValue().mChannel);
+            return channels;
         }
 
         /**
@@ -229,9 +243,9 @@ public class TimeLine {
          */
         public LinkedHashMap<String, InputChannel> getVideoChannels() {
             LinkedHashMap<String, InputChannel> channels = new LinkedHashMap<String, InputChannel>();
-            for (Map.Entry<String, TimeLine.InputChannel> entry : mChannels.entrySet())
-                if (entry.getValue().mChannelType == ChannelType.VIDEO || entry.getValue().mChannelType == ChannelType.BOTH)
-                    channels.put(entry.getKey(), entry.getValue());
+            for (Map.Entry<String, TimeLine.SegmentChannel> entry : mSegmentChannels.entrySet())
+                if (entry.getValue().mChannel.mChannelType == ChannelType.VIDEO || entry.getValue().mChannel.mChannelType == ChannelType.AUDIO_VIDEO)
+                    channels.put(entry.getKey(), entry.getValue().mChannel);
             return channels;
         }
 
@@ -241,9 +255,9 @@ public class TimeLine {
          */
         public LinkedHashMap<String, InputChannel> getAudioChannels() {
             LinkedHashMap<String, InputChannel> channels = new LinkedHashMap<String, InputChannel>();
-            for (Map.Entry<String, TimeLine.InputChannel> entry : mChannels.entrySet())
-                if (entry.getValue().mChannelType == ChannelType.AUDIO || entry.getValue().mChannelType == ChannelType.BOTH)
-                    channels.put(entry.getKey(), entry.getValue());
+            for (Map.Entry<String, TimeLine.SegmentChannel> entry : mSegmentChannels.entrySet())
+                if (entry.getValue().mChannel.mChannelType == ChannelType.AUDIO || entry.getValue().mChannel.mChannelType == ChannelType.AUDIO_VIDEO)
+                    channels.put(entry.getKey(), entry.getValue().mChannel);
             return channels;
         }
 
@@ -278,46 +292,34 @@ public class TimeLine {
         /**
          * Add a single channel routed directly to the encoder
          *
-         * @param inputChannel
-         */
-        public Segment audio(String inputChannel) {
-            mVideoPatches.add(new VideoPatch(inputChannel, null));
-            mChannels.put(inputChannel, TimeLine.this.mChannels.get(inputChannel));
-            return this;
-        }
-
-
-        /**
-         * Add a single channel routed directly to the encoder
-         *
          * @param inputChannelName
          */
         public Segment output(String inputChannelName) {
-            InputChannel inputChannel = TimeLine.this.mChannels.get(inputChannelName);
+            InputChannel inputChannel = mTimeLineChannels.get(inputChannelName);
             if (inputChannel.mChannelType != ChannelType.AUDIO)
-                mVideoPatches.add(new VideoPatch(inputChannelName, null));
-            mChannels.put(inputChannelName, inputChannel);
+                mSegmentChannels.put(inputChannelName, new SegmentChannel(inputChannel, null));
             return this;
         }
 
         /**
          * Add a single channel input that is filtered before being sent to the encoder
          *
-         * @param inputChannel
+         * @param inputChannelName
+         * @param filter
          */
-        public Segment output(String inputChannel, Filter filter) {
-            mVideoPatches.add(new VideoPatch(inputChannel, filter));
-            mChannels.put(inputChannel, TimeLine.this.mChannels.get(inputChannel));
+        public Segment output(String inputChannelName, Filter filter) {
+            InputChannel inputChannel = mTimeLineChannels.get(inputChannelName);
+            mSegmentChannels.put(inputChannelName, new SegmentChannel(inputChannel, filter));
             return this;
         }
 
 
         int getChannelCount() {
-            return mVideoPatches.size();
+            return mSegmentChannels.size();
         }
 
-        List<VideoPatch> getVideoPatches() {
-            return mVideoPatches;
+        LinkedHashMap<String, SegmentChannel> getSegmentChannels() {
+            return mSegmentChannels;
         }
 
     }

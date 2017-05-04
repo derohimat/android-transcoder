@@ -221,16 +221,17 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         // Create array of texture renderers for each patch in the segment
         mTextureRender = new ArrayList<TextureRender>();
         ArrayList<OutputSurface> outputSurfaces = new ArrayList<OutputSurface>(2);
-        for (TimeLine.VideoPatch videoPatch : segment.getVideoPatches()) {
-            DecoderWrapper decoderWrapper = mDecoderWrappers.get(videoPatch.mInput);
+        for (Map.Entry<String, TimeLine.SegmentChannel> segmentChannelEntry : segment.getSegmentChannels().entrySet()) {
+            TimeLine.SegmentChannel segmentChannel = segmentChannelEntry.getValue();
+            DecoderWrapper decoderWrapper = mDecoderWrappers.get(segmentChannelEntry.getKey());
             outputSurfaces.add(decoderWrapper.mOutputSurface);
-            decoderWrapper.setFilter(videoPatch.mFilter, mOutputPresentationTimeDecodedUs, segment.getDuration());
+            decoderWrapper.setFilter(segmentChannel.mFilter, mOutputPresentationTimeDecodedUs, segment.getDuration());
         }
         TextureRender textureRender = new TextureRender(outputSurfaces);
         textureRender.surfaceCreated();
         mTextureRender.add(textureRender);
-        Log.d(TAG, "Surface Texture Created for " + segment.getVideoPatches().size() + " surfaces");
-        mTextures = segment.getVideoPatches().size();
+        Log.d(TAG, "Surface Texture Created for " + segment.getSegmentChannels().size() + " surfaces");
+        mTextures = segment.getSegmentChannels().size();
         mIsSegmentFinished = false;
         mIsEncoderEOS = false;
         mIsLastSegment = segment.isLastSegment;

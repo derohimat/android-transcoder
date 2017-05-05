@@ -31,7 +31,6 @@ public class SingleFileTranscoderTest {
     private static final String TAG = "JUnitTranscoder";
     private String inputFileName1;
     private String inputFileName2;
-    private String outputFileName;
     private volatile String status = "not started";
 
     MediaTranscoder.Listener listener = new MediaTranscoder.Listener() {
@@ -60,10 +59,8 @@ public class SingleFileTranscoderTest {
     public void retrieveVideo ()  {
         inputFileName1 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input1.mp4";
         inputFileName2 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input2.mp4";
-        outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output.mp4";
         cleanup(inputFileName1);
         cleanup(inputFileName2);
-        cleanup(outputFileName);
         try {
             InputStream in = InstrumentationRegistry.getContext().getResources().openRawResource(net.ypresto.androidtranscoder.example.test.R.raw.poolcleaner);
             OutputStream out = new FileOutputStream(inputFileName1);
@@ -84,10 +81,12 @@ public class SingleFileTranscoderTest {
         }
     }
     @Test()
-    public void TranscodeTwoFiles() {
+    public void CrossfadeStitch() {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_stitch.mp4";
+                cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
                 ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File(inputFileName2), ParcelFileDescriptor.MODE_READ_ONLY);
                 TimeLine timeline = new TimeLine()
@@ -95,30 +94,69 @@ public class SingleFileTranscoderTest {
                         .addChannel("B", in1.getFileDescriptor())
                         .addChannel("C", in1.getFileDescriptor())
                         .addAudioOnlyChannel("D", in2.getFileDescriptor())
-                        .createSegment()
-                            .output("C")
-                            .output("D")
-                            .duration(1000)
-                        .timeLine().createSegment()
-                            .output("C", TimeLine.Filter.OPACITY_DOWN_RAMP)
-                            .output("A", TimeLine.Filter.OPACITY_UP_RAMP)
-                            .output("D")
-                            .duration(3000)
-                        .timeLine().createSegment()
-                            .duration(1500)
-                            .output("A")
-                            .output("D")
-                        .timeLine().createSegment()
-                            .seek("B", 1000)
-                            .output("B")
-                            .duration(1500)
-                            .output("D")
-                        .timeLine();
+                    .createSegment()
+                        .output("C")
+                        .output("D")
+                        .duration(1000)
+                    .timeLine().createSegment()
+                        .output("C", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                        .output("A", TimeLine.Filter.OPACITY_UP_RAMP)
+                        .output("D")
+                        .duration(2000)
+                    .timeLine().createSegment()
+                        .duration(1500)
+                        .output("A")
+                        .output("D")
+                    .timeLine().createSegment()
+                        .seek("B", 1000)
+                        .output("B")
+                        .duration(1500)
+                        .output("D")
+                    .timeLine();
                 (MediaTranscoder.getInstance().transcodeVideo(
                         timeline, outputFileName,
                         MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
                         listener)
                 ).get();
+            }
+        });
+    }
+    @Test()
+    public void HopScotch() {
+        runTest(new Transcode() {
+            @Override
+            public void run() throws IOException, InterruptedException, ExecutionException {
+            String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_hopscotch.mp4";
+            cleanup(outputFileName);
+            ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+            TimeLine timeline = new TimeLine()
+                .addChannel("A", in1.getFileDescriptor())
+                .addChannel("B", in1.getFileDescriptor())
+                .createSegment()
+                    .output("A")
+                    .duration(500)
+                .timeLine().createSegment()
+                    .output("A", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                    .seek("B", 750)
+                    .output("B", TimeLine.Filter.OPACITY_UP_RAMP)
+                    .duration(500)
+                .timeLine().createSegment()
+                    .duration(500)
+                    .output("B")
+                .timeLine().createSegment()
+                    .output("B", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                    .seek("A", 750)
+                    .output("A", TimeLine.Filter.OPACITY_UP_RAMP)
+                    .duration(500)
+                .timeLine().createSegment()
+                    .duration(500)
+                    .output("A")
+                .timeLine();
+            (MediaTranscoder.getInstance().transcodeVideo(
+                    timeline, outputFileName,
+                    MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
+                    listener)
+            ).get();
             }
         });
     }
@@ -136,8 +174,6 @@ public class SingleFileTranscoderTest {
             assertEquals("Exception on Transcode", "none", e + Log.getStackTraceString(e));
 
         }
-        File file =new File(outputFileName);
-        Log.d(TAG, " output file size " + file.length());
         assertEquals("Completed", status, "complete");
     }
 

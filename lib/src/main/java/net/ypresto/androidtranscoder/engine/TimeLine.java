@@ -79,6 +79,19 @@ public class TimeLine {
         return this;
     }
 
+
+    /**
+     * Add a video/audio input and assign as a channel
+     *
+     * @param inputFileDescriptor
+     * @param inputChannel
+     * @return
+     */
+    public TimeLine addImageChannel(String inputChannel, FileDescriptor inputFileDescriptor) {
+        mTimeLineChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.IMAGE));
+        return this;
+    }
+
     /**
      * Add a video/audio input and assign as a channel
      *
@@ -152,7 +165,7 @@ public class TimeLine {
         public Long mLengthUs;  // Length based on metadata
         public Long mInputStartTimeUs = 0l;
         public Long mInputEndTimeUs;
-        public Long mInputAcutalEndTimeUs;
+        public Long mInputAcutalEndTimeUs =0l;
         public Long mInputOffsetUs;
         public ChannelType mChannelType;
         public FileDescriptor mInputFileDescriptor = null;
@@ -192,13 +205,7 @@ public class TimeLine {
                 SegmentChannel segmentChannel = segmentChannelEntry.getValue();
                 String channelName = segmentChannelEntry.getKey();
                 InputChannel inputChannel = segmentChannel.mChannel;
-                if (previousSegment != null && previousSegment.mSegmentChannels.containsKey(channelName)) {
-                    InputChannel previousChannel = mTimeLine.mTimeLineChannels.get(channelName);
-                    inputChannel.mInputStartTimeUs = mSeeks.get(channelName) != null ?
-                            mSeeks.get(channelName) + previousChannel.mInputAcutalEndTimeUs : previousChannel.mInputAcutalEndTimeUs;
-                } else {
-                    inputChannel.mInputStartTimeUs = mSeeks.get(channelName) != null ? mSeeks.get(channelName) : 0l;
-                }
+                inputChannel.mInputStartTimeUs = (mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l) + inputChannel.mInputAcutalEndTimeUs;
                 inputChannel.mInputOffsetUs = mOutputStartTimeUs - inputChannel.mInputStartTimeUs;
                 inputChannel.mInputEndTimeUs = mDuration != null ? inputChannel.mInputStartTimeUs + mDuration : null;
                 inputChannel.mInputAcutalEndTimeUs = mOutputStartTimeUs;

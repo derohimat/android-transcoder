@@ -186,18 +186,11 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         Iterator<Map.Entry<String, VideoTrackTranscoder.DecoderWrapper>> iterator = mDecoderWrappers.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<String, VideoTrackTranscoder.DecoderWrapper> decoderWrapperEntry = iterator.next();
-            if (!segment.getAudioChannels().containsKey(decoderWrapperEntry.getKey())) {
+            if (!segment.getVideoChannels().containsKey(decoderWrapperEntry.getKey()) && mDecoderWrappers.entrySet().size() > 2) {
                 decoderWrapperEntry.getValue().release();
+                segment.getVideoChannels().get(decoderWrapperEntry.getKey()).mInputEndTimeUs = 0l;
                 iterator.remove();
                 Log.d(TAG, "Releasing Video Decoder " + decoderWrapperEntry.getKey());
-            }
-        }
-
-        for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
-            if (!segment.getVideoChannels().containsKey(decoderWrapperEntry.getKey())) {
-                decoderWrapperEntry.getValue().release();
-                mDecoderWrappers.remove(decoderWrapperEntry.getKey());
-                Log.d(TAG, "Releasing Audio Decoder " + decoderWrapperEntry.getKey());
             }
         }
 
@@ -421,7 +414,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                     // NOTE: doRender will block if buffer (of encoder) is full.
                     // Refer: http://bigflake.com/mediacodec/CameraToMpegTest.java.txt
 
-                    // End of Stream
+                    // End of Segment
                     if (doRender && inputChannel.mInputEndTimeUs != null && bufferInputStartTime >= inputChannel.mInputEndTimeUs) {
                         decoderWrapper.requeueOutputBuffer();
                         decoderWrapper.mIsSegmentEOS = true;

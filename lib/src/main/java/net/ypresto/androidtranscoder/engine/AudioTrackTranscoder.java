@@ -142,6 +142,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         while (iterator.hasNext()) {
             Map.Entry<String, DecoderWrapper> decoderWrapperEntry = iterator.next();
             if (!segment.getAudioChannels().containsKey(decoderWrapperEntry.getKey())) {
+                segment.timeLine().getChannels().get(decoderWrapperEntry.getKey()).mInputEndTimeUs = 0l;
                 decoderWrapperEntry.getValue().release();
                 iterator.remove();
                 Log.d(TAG, "Releasing Audio Decoder " + decoderWrapperEntry.getKey());

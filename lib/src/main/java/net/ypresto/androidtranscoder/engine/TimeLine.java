@@ -37,6 +37,13 @@ import java.util.Map;
  *          .output("movie3")
  *      .timeLine().start()
  */
+
+
+/**
+ * TimeLine contains a list of segments which defines each sequential segment of time that
+ * has a unique configuration of channels to be combined and output during that time range.
+ * TimeLine also contains inputChannels which may be assigned to each segment
+ */
 public class TimeLine {
 
     static long TO_END_OF_FILE = -1;

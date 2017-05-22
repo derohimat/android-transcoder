@@ -188,7 +188,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             Map.Entry<String, VideoTrackTranscoder.DecoderWrapper> decoderWrapperEntry = iterator.next();
             if (!segment.getVideoChannels().containsKey(decoderWrapperEntry.getKey()) && mDecoderWrappers.entrySet().size() > 2) {
                 decoderWrapperEntry.getValue().release();
-                segment.getVideoChannels().get(decoderWrapperEntry.getKey()).mInputEndTimeUs = 0l;
+                segment.timeLine().getChannels().get(decoderWrapperEntry.getKey()).mInputEndTimeUs = 0l;
                 iterator.remove();
                 Log.d(TAG, "Releasing Video Decoder " + decoderWrapperEntry.getKey());
             }

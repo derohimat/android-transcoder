@@ -188,12 +188,15 @@ public class MediaTranscoder {
                 engine.setProgressCallback(new MediaTranscoderEngine.ProgressCallback() {
                     @Override
                     public void onProgress(final double progress) {
+                        listener.onTranscodeProgress(progress);
+                        /*
                         handler.post(new Runnable() { // TODO: reuse instance
                             @Override
                             public void run() {
                                 listener.onTranscodeProgress(progress);
                             }
                         });
+                        */
                     }
                 });
                 engine.transcodeVideo(timeLine, outPath, outFormatStrategy);

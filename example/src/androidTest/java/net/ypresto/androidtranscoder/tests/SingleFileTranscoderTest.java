@@ -40,9 +40,8 @@ public class SingleFileTranscoderTest {
         }
         @Override
         public void onTranscodeCompleted() {
-            Log.d(TAG, "Complete");
             status = "complete";
-            Log.d(TAG, "Status set to Complete");
+            Log.d(TAG, "Complete");
         }
         @Override
         public void onTranscodeCanceled() {
@@ -174,7 +173,6 @@ public class SingleFileTranscoderTest {
             assertEquals("Exception on Transcode", "none", e + Log.getStackTraceString(e));
 
         }
-        assertEquals("Completed", status, "complete");
     }
 
 

@@ -43,13 +43,20 @@ public class MediaTranscoder {
     private ThreadPoolExecutor mExecutor;
 
     private MediaTranscoder() {
+        Looper looper = Looper.myLooper();
+        if (looper == null)
+            looper = Looper.getMainLooper();
+        final int priority = looper.getThread().getPriority();
         mExecutor = new ThreadPoolExecutor(
                 0, MAXIMUM_THREAD, 60, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<Runnable>(),
                 new ThreadFactory() {
                     @Override
                     public Thread newThread(Runnable r) {
-                        return new Thread(r, "MediaTranscoder-Worker");
+                        Thread thread = new Thread(r, "MediaTranscoder-Worker");
+                        Log.d(TAG, "creating MediaTranscoder-Worker thread at priority " + priority);
+                        thread.setPriority(priority - 1);
+                        return thread;
                     }
                 });
     }
@@ -188,15 +195,12 @@ public class MediaTranscoder {
                 engine.setProgressCallback(new MediaTranscoderEngine.ProgressCallback() {
                     @Override
                     public void onProgress(final double progress) {
-                        listener.onTranscodeProgress(progress);
-                        /*
                         handler.post(new Runnable() { // TODO: reuse instance
                             @Override
                             public void run() {
                                 listener.onTranscodeProgress(progress);
                             }
                         });
-                        */
                     }
                 });
                 engine.transcodeVideo(timeLine, outPath, outFormatStrategy);

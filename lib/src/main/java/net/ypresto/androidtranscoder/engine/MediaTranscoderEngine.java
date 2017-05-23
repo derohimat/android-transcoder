@@ -218,6 +218,7 @@ public class MediaTranscoderEngine {
             }
         }
         mDurationUs = timeLine.getDuration();
+        Log.d(TAG, "Total duration " + mDurationUs);
         if (videoOutputFormat == null && audioOutputFormat == null) {
             throw new InvalidOutputFormatException("MediaFormatStrategy returned pass-through for both video and audio. No transcoding is necessary.");
         }
@@ -279,9 +280,7 @@ public class MediaTranscoderEngine {
                 loopCount++;
 
                 if (mDurationUs > 0 && loopCount % PROGRESS_INTERVAL_STEPS == 0) {
-                    double videoProgress = mVideoTrackTranscoder.isSegmentFinished() ? 1.0 : Math.min(1.0, (double) mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs() / mDurationUs);
-                    double audioProgress = mAudioTrackTranscoder.isSegmentFinished() ? 1.0 : Math.min(1.0, (double) mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs() / mDurationUs);
-                    double progress = (videoProgress + audioProgress) / 2.0;
+                    double progress = Math.min(1.0, (double) mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs() / mDurationUs);
                     mProgress = progress;
                     if (mProgressCallback != null) mProgressCallback.onProgress(progress);
                 }

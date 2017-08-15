@@ -165,7 +165,7 @@ public class MediaTranscoderEngine {
         MediaFormat videoOutputFormat = null;
         MediaFormat audioOutputFormat = null;
         MediaExtractorUtils.TrackResult trackResult = null;
-        boolean allowPassthru = timeLine.getChannels().size() == 1;
+        boolean allowPassthru = false;//timeLine.getChannels().size() == 1;
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : timeLine.getChannels().entrySet()) {
 
             TimeLine.InputChannel inputChannel = inputChannelEntry.getValue();

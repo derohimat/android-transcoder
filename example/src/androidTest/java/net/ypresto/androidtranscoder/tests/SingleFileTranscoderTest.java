@@ -79,6 +79,54 @@ public class SingleFileTranscoderTest {
             assertEquals("Exception on file copy", "none", e + Log.getStackTraceString(e));
         }
     }
+
+    @Test()
+    public void SingleFile() {
+        runTest(new Transcode() {
+            @Override
+            public void run() throws IOException, InterruptedException, ExecutionException {
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFile.mp4";
+                cleanup(outputFileName);
+                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+                TimeLine timeline = new TimeLine()
+                        .addChannel("A", in1.getFileDescriptor())
+                        .createSegment()
+                            .output("A")
+                        .timeLine();
+                (MediaTranscoder.getInstance().transcodeVideo(
+                        timeline, outputFileName,
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
+                        listener)
+                ).get();
+            }
+        });
+    }
+    @Test()
+    public void DualFile() {
+        runTest(new Transcode() {
+            @Override
+            public void run() throws IOException, InterruptedException, ExecutionException {
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_DualFile.mp4";
+                cleanup(outputFileName);
+                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+                ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File(inputFileName2), ParcelFileDescriptor.MODE_READ_ONLY);
+                TimeLine timeline = new TimeLine()
+                    .addChannel("A", in1.getFileDescriptor())
+                    .addChannel("B", in2.getFileDescriptor())
+                    .createSegment()
+                        .output("A")
+                        .timeLine()
+                    .createSegment()
+                        .output("B")
+                        .timeLine();
+                (MediaTranscoder.getInstance().transcodeVideo(
+                        timeline, outputFileName,
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
+                        listener)
+                ).get();
+            }
+        });
+    }
     @Test()
     public void CrossfadeStitch() {
         runTest(new Transcode() {

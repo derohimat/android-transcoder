@@ -179,7 +179,7 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         mSurface.release();
         // this causes a bunch of warnings that appear harmless but might confuse someone:
         //  W BufferQueue: [unnamed-3997-2] cancelBuffer: BufferQueue has been abandoned!
-        //mSurfaceTexture.release();
+        mSurfaceTexture.release();
         mEGLDisplay = EGL14.EGL_NO_DISPLAY;
         mEGLContext = EGL14.EGL_NO_CONTEXT;
         mEGLSurface = EGL14.EGL_NO_SURFACE;

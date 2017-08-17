@@ -102,22 +102,33 @@ public class SingleFileTranscoderTest {
         });
     }
     @Test()
-    public void DualFile() {
+    public void QuadFile() {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
-                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_DualFile.mp4";
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_QuadFile.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
-                ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File(inputFileName2), ParcelFileDescriptor.MODE_READ_ONLY);
                 TimeLine timeline = new TimeLine()
                     .addChannel("A", in1.getFileDescriptor())
-                    .addChannel("B", in2.getFileDescriptor())
+                    .addChannel("B", in1.getFileDescriptor())
+                    .addChannel("C", in1.getFileDescriptor())
+                    .addChannel("D", in1.getFileDescriptor())
                     .createSegment()
                         .output("A")
+ //                       .duration(4000)
                         .timeLine()
                     .createSegment()
                         .output("B")
+//                        .duration(4000)
+                        .timeLine()
+                    .createSegment()
+                        .output("C")
+//                        .duration(4000)
+                        .timeLine()
+                    .createSegment()
+                        .output("D")
+//                        .duration(4000)
                         .timeLine();
                 (MediaTranscoder.getInstance().transcodeVideo(
                         timeline, outputFileName,

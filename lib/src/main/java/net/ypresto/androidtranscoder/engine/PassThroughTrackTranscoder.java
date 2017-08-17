@@ -66,7 +66,7 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
 
     @SuppressLint("Assert")
     @Override
-    public boolean stepPipeline(TimeLine.Segment segment) {
+    public boolean stepPipeline(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle) {
         if (mIsEOS) return false;
         int trackIndex = mExtractor.getSampleTrackIndex();
         if (trackIndex < 0) {
@@ -94,14 +94,6 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
     @Override
     public long getOutputPresentationTimeDecodedUs() { return mOutputPresentationTimeExtractedUs; }
 
-    @Override
-    public void setSyncTimeUs(long syncTimeUs) {
-        mOutputPresentationTimeToSyncToUs = syncTimeUs;
-    }
-    @Override
-    public long getSyncTimeUs () {
-        return mOutputPresentationTimeToSyncToUs;
-    }
     @Override
     public String getSyncChannel () {
         return mChannelToSyncToUs;

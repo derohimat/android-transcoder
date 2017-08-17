@@ -49,6 +49,37 @@ public class MediaTranscoderEngine {
     private long mDurationUs;
 
     /**
+     * The throttle ensures that an encoder doesn't overrun another encoder and produce output
+     * time stamps that are two far apart from one another.  A low-water mark is kept for the
+     * presentation time and all decoder actions must yield a presentation time at least that
+     * hight or they requeue the buffer until
+     */
+    public enum ThrottleStatus {BUFFER_UNKNOWN, BUFFER_PROCESSED, BUFFER_WAITING};
+    public class TranscodeThrottle {
+        private Long mMaximumPresentationTime = 0l;
+        private ThrottleStatus mStatus = ThrottleStatus.BUFFER_UNKNOWN;
+        public boolean canProceed(Long presentationTime) {
+
+            if (presentationTime <= (mMaximumPresentationTime + 250000)) {
+                mStatus = ThrottleStatus.BUFFER_PROCESSED;
+                mMaximumPresentationTime = presentationTime;
+                return true;
+            } else {
+                if (mStatus != ThrottleStatus.BUFFER_PROCESSED)
+                    mStatus = ThrottleStatus.BUFFER_WAITING;
+                return false;
+            }
+
+        }
+        public void step () {
+            if (mStatus == ThrottleStatus.BUFFER_WAITING)
+                mMaximumPresentationTime += 10000l;
+            mStatus = ThrottleStatus.BUFFER_UNKNOWN;
+        }
+    }
+    private TranscodeThrottle mThrottle  = new TranscodeThrottle();
+
+    /**
      * Do not use this constructor unless you know what you are doing.
      */
     public MediaTranscoderEngine() {
@@ -265,16 +296,8 @@ public class MediaTranscoderEngine {
             mVideoTrackTranscoder.setupDecoders(outputSegment);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
 
-                // Set lowest sync time
-                if (mVideoTrackTranscoder.getSyncTimeUs() < mAudioTrackTranscoder.getSyncTimeUs()) {
-                    mVideoTrackTranscoder.setSyncTimeUs(mAudioTrackTranscoder.getSyncTimeUs());
-                    mVideoTrackTranscoder.setSyncChannel(mAudioTrackTranscoder.getSyncChannel());
-                } else {
-                    mAudioTrackTranscoder.setSyncTimeUs(mVideoTrackTranscoder.getSyncTimeUs());
-                    mAudioTrackTranscoder.setSyncChannel(mVideoTrackTranscoder.getSyncChannel());
-                }
-
-                boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment) || mAudioTrackTranscoder.stepPipeline(outputSegment);
+               boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment, mThrottle) ||
+                                  mAudioTrackTranscoder.stepPipeline(outputSegment, mThrottle);
                 outputPresentationTimeDecodedUs = Math.max(mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(),
                     mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
                 loopCount++;
@@ -292,6 +315,7 @@ public class MediaTranscoderEngine {
                         // nothing to do
                     }
                 }
+                mThrottle.step();
             }
 
         }

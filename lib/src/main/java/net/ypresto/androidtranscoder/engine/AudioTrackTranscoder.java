@@ -46,7 +46,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     private boolean mIsSegmentFinished;
     private boolean mIsLastSegment = false;
     private long mOutputPresentationTimeDecodedUs = 0l;
-    private long mOutputPresentationTimeToSyncToUs = 0l;
     private String mChannelToSyncTo = "";
     private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
 
@@ -73,6 +72,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         private MediaCodec mDecoder;
         private Integer mTrackIndex;
         boolean mBufferRequeued;
+        private Long mPresentationTimeRequeued = null;
         int mResult;
         private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
         DecoderWrapper(MediaExtractor mediaExtractor) {
@@ -185,14 +185,14 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     }
 
     @Override
-    public boolean stepPipeline(TimeLine.Segment outputSegment) {
+    public boolean stepPipeline(TimeLine.Segment outputSegment, MediaTranscoderEngine.TranscodeThrottle throttle) {
         boolean stepped = false;
         Long presentationTimeUs;
 
         int status;
         while (drainEncoder(0) != DRAIN_STATE_NONE) stepped = true;
         do {
-            status = drainDecoder(outputSegment, 0);
+            status = drainDecoder(outputSegment, 0, throttle);
             if (status != DRAIN_STATE_NONE) stepped = true;
             // NOTE: not repeating to keep from deadlock when encoder is full.
         } while (status == DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY);
@@ -257,7 +257,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         return  sampleProcessed ? DRAIN_STATE_CONSUMED : DRAIN_STATE_NONE;
     }
 
-    private int drainDecoder(TimeLine.Segment segment, long timeoutUs) {
+    private int drainDecoder(TimeLine.Segment segment, long timeoutUs, MediaTranscoderEngine.TranscodeThrottle throttle) {
 
         boolean consumed = false;
 
@@ -270,7 +270,9 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
 
             // Only process if we have not end end of stream for this decoder or extractor
-            if (!decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS) {
+            if (!decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS &&
+                (decoderWrapper.mPresentationTimeRequeued == null || throttle.canProceed(decoderWrapper.mPresentationTimeRequeued))) {
+                decoderWrapper.mPresentationTimeRequeued =  null;
 
                 if (inputChannel.mInputEndTimeUs != null &&
                         mOutputPresentationTimeDecodedUs - inputChannel.mInputOffsetUs > inputChannel.mInputEndTimeUs) {
@@ -310,20 +312,19 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                         Log.d(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
-                        mOutputPresentationTimeToSyncToUs = Math.max(bufferOutputTime + BUFFER_LEAD_TIME, mOutputPresentationTimeToSyncToUs);
 
                     // Requeue buffer if to far ahead of other tracks
-                    } else if (bufferOutputTime > mOutputPresentationTimeToSyncToUs) {
+                    } else if (!throttle.canProceed(bufferOutputTime)) {
                         decoderWrapper.requeueOutputBuffer();
-                        Log.d(TAG, "Requeue Audio Buffer " + bufferOutputTime + " > " + mOutputPresentationTimeToSyncToUs + " for decoder " + channelName);
+                        Log.d(TAG, "Requeue Audio Buffer " + bufferOutputTime + " for decoder " + channelName);
                         consumed = false;
+                        decoderWrapper.mPresentationTimeRequeued =  bufferOutputTime;
 
-                    // Submit buffer for audio mixing
+                        // Submit buffer for audio mixing
                     } else {
                         Log.d(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs, inputChannel.mInputOffsetUs, inputChannel.mInputStartTimeUs, inputChannel.mInputEndTimeUs);
-                        mOutputPresentationTimeToSyncToUs = Math.max(bufferOutputTime + BUFFER_LEAD_TIME, mOutputPresentationTimeToSyncToUs);;
                     }
                 }
             }
@@ -391,14 +392,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         return mOutputPresentationTimeDecodedUs;
     }
 
-    @Override
-    public void setSyncTimeUs(long syncTimeUs) {
-        mOutputPresentationTimeToSyncToUs = syncTimeUs;
-    }
-    @Override
-    public long getSyncTimeUs () {
-        return mOutputPresentationTimeToSyncToUs;
-    }
     @Override
     public String getSyncChannel () {
         return mChannelToSyncTo;

@@ -39,7 +39,7 @@ public interface TrackTranscoder {
      *
      * @return true if data moved in pipeline.
      */
-    boolean stepPipeline(TimeLine.Segment segment);
+    boolean stepPipeline(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle);
 
     /**
      * Get presentation time of last sample written to muxer.
@@ -47,8 +47,6 @@ public interface TrackTranscoder {
      * @return Presentation time in micro-second. Return value is undefined if finished writing.
      */
     long getOutputPresentationTimeDecodedUs();
-    long getSyncTimeUs();
-    void setSyncTimeUs(long syncTimeUs);
     String getSyncChannel();
     void setSyncChannel(String syncChannel);
 

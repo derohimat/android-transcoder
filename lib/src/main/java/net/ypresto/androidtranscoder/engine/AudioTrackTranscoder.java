@@ -132,10 +132,9 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         mEncoderBuffers = new MediaCodecBufferCompatWrapper(mEncoder);
 
     }
-    @Override
-    public void setupDecoders(TimeLine.Segment segment) {
-
-        Log.d(TAG, "Setting up Audio Decoders for segment at " + segment.mOutputStartTimeUs + " for a duration of " + segment.getDuration());
+    private void createWrapperSlot (TimeLine.Segment segment) {
+        if (mDecoderWrappers.keySet().size() < 2)
+            return;
 
         // Release any inactive decoders
         Iterator<Map.Entry<String, DecoderWrapper>> iterator = mDecoderWrappers.entrySet().iterator();
@@ -146,8 +145,16 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                 decoderWrapperEntry.getValue().release();
                 iterator.remove();
                 Log.d(TAG, "Releasing Audio Decoder " + decoderWrapperEntry.getKey());
+                return;
             }
         }
+
+    }
+    @Override
+    public void setupDecoders(TimeLine.Segment segment) {
+
+        Log.d(TAG, "Setting up Audio Decoders for segment at " + segment.mOutputStartTimeUs + " for a duration of " + segment.getDuration());
+
 
         LinkedHashMap<String, MediaCodec> decoders = new LinkedHashMap<String, MediaCodec>();
 
@@ -158,6 +165,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(channelName);
             if (decoderWrapper == null) {
+                createWrapperSlot(segment);
                 decoderWrapper = new DecoderWrapper(mExtractors.get(channelName));
                 mDecoderWrappers.put(channelName, decoderWrapper);
             }

@@ -159,6 +159,39 @@ public class SingleFileTranscoderTest {
             }
         });
     }
+    @Test()
+    public void HopScotch2() {
+        runTest(new Transcode() {
+            @Override
+            public void run() throws IOException, InterruptedException, ExecutionException {
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch.mp4";
+                cleanup(outputFileName);
+                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+                TimeLine timeline = new TimeLine()
+                        .addChannel("A", in1.getFileDescriptor())
+                        .addChannel("B", in1.getFileDescriptor())
+                        .createSegment()
+                            .output("A")
+                            .duration(1000)
+                        .timeLine().createSegment()
+                            .output("A", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                            .seek("B", 2000)
+                            .output("B", TimeLine.Filter.OPACITY_UP_RAMP)
+                            .duration(500)
+                        .timeLine().createSegment()
+                            .duration(1500)
+                            .output("A")
+                            .seek("A", 2500)
+                            .timeLine();
+                (MediaTranscoder.getInstance().transcodeVideo(
+                        timeline, outputFileName,
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
+                        listener)
+                ).get();
+            }
+        });
+    }
+
     public interface Transcode {
         void run () throws IOException, InterruptedException, ExecutionException;
     }

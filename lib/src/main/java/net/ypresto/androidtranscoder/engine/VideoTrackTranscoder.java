@@ -171,7 +171,25 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         mEncoderStarted = true;
         mEncoderOutputBuffers = mEncoder.getOutputBuffers();
     }
+    private void createWrapperSlot (TimeLine.Segment segment) {
 
+        if (mDecoderWrappers.keySet().size() < 2)
+            return;
+
+        // Release any inactive decoders
+        Iterator<Map.Entry<String, VideoTrackTranscoder.DecoderWrapper>> iterator = mDecoderWrappers.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, VideoTrackTranscoder.DecoderWrapper> decoderWrapperEntry = iterator.next();
+            if (!segment.getVideoChannels().containsKey(decoderWrapperEntry.getKey())) {
+                decoderWrapperEntry.getValue().release();
+                segment.timeLine().getChannels().get(decoderWrapperEntry.getKey()).mInputEndTimeUs = 0l;
+                iterator.remove();
+                Log.d(TAG, "Releasing Video Decoder " + decoderWrapperEntry.getKey());
+                return;
+            }
+        }
+
+    }
     /**
      * Setup all decoders and texture renderers needed for this segment - called at start of segment processing
      * We also close any ones not needed for this segment that may have been opened in a previous segment
@@ -182,25 +200,14 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
         Log.d(TAG, "Setting up Video Decoders for segment at " + segment.mOutputStartTimeUs + " for a duration of " + segment.getDuration());
 
-        // Release any inactive decoders
-        Iterator<Map.Entry<String, VideoTrackTranscoder.DecoderWrapper>> iterator = mDecoderWrappers.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<String, VideoTrackTranscoder.DecoderWrapper> decoderWrapperEntry = iterator.next();
-            if (!segment.getVideoChannels().containsKey(decoderWrapperEntry.getKey()) && mDecoderWrappers.entrySet().size() > 2) {
-                decoderWrapperEntry.getValue().release();
-                segment.timeLine().getChannels().get(decoderWrapperEntry.getKey()).mInputEndTimeUs = 0l;
-                iterator.remove();
-                Log.d(TAG, "Releasing Video Decoder " + decoderWrapperEntry.getKey());
-            }
-        }
-
-        // Start any decoders being opened for the first time
+          // Start any decoders being opened for the first time
 
         for (Map.Entry<String, TimeLine.InputChannel> entry : segment.getVideoChannels().entrySet()) {
             TimeLine.InputChannel inputChannel = entry.getValue();
             String channelName = entry.getKey();
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(channelName);
             if (decoderWrapper == null) {
+                createWrapperSlot(segment);
                 decoderWrapper = new DecoderWrapper(mExtractors.get(channelName));
                 mDecoderWrappers.put(channelName, decoderWrapper);
             }

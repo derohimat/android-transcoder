@@ -52,7 +52,7 @@ public class MediaTranscoderEngine {
      * The throttle ensures that an encoder doesn't overrun another encoder and produce output
      * time stamps that are two far apart from one another.  A low-water mark is kept for the
      * presentation time and all decoder actions must yield a presentation time at least that
-     * hight or they requeue the buffer until
+     * high or they must re-queue the buffer until they catch up
      */
     public enum ThrottleStatus {BUFFER_UNKNOWN, BUFFER_PROCESSED, BUFFER_WAITING};
     public class TranscodeThrottle {
@@ -62,7 +62,7 @@ public class MediaTranscoderEngine {
 
             if (presentationTime <= (mMaximumPresentationTime + 250000)) {
                 mStatus = ThrottleStatus.BUFFER_PROCESSED;
-                mMaximumPresentationTime = presentationTime;
+                //mMaximumPresentationTime = presentationTime;
                 return true;
             } else {
                 if (mStatus != ThrottleStatus.BUFFER_PROCESSED)
@@ -73,7 +73,7 @@ public class MediaTranscoderEngine {
         }
         public void step () {
             if (mStatus == ThrottleStatus.BUFFER_WAITING)
-                mMaximumPresentationTime += 10000l;
+                mMaximumPresentationTime += 100000l;
             mStatus = ThrottleStatus.BUFFER_UNKNOWN;
         }
     }

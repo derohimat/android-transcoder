@@ -207,7 +207,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
         while ((presentationTimeUs = mAudioChannel.feedEncoder(0)) != null) {
             if (presentationTimeUs >= 0) {
-                Log.d(TAG, "Encoded audio from " + mOutputPresentationTimeDecodedUs + " to " + presentationTimeUs);
+                //Log.d(TAG, "Encoded audio from " + mOutputPresentationTimeDecodedUs + " to " + presentationTimeUs);
                 mOutputPresentationTimeDecodedUs = Math.max(mOutputPresentationTimeDecodedUs, presentationTimeUs);
             } else {
                 for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
@@ -319,18 +319,18 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     if (bufferInputStartTime < inputChannel.mInputStartTimeUs) {
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
-                        Log.d(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
+                        //Log.d(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
 
                     // Requeue buffer if to far ahead of other tracks
                     } else if (!throttle.canProceed(bufferOutputTime)) {
                         decoderWrapper.requeueOutputBuffer();
-                        Log.d(TAG, "Requeue Audio Buffer " + bufferOutputTime + " for decoder " + channelName);
+                        //Log.d(TAG, "Requeue Audio Buffer " + bufferOutputTime + " for decoder " + channelName);
                         consumed = false;
                         decoderWrapper.mPresentationTimeRequeued =  bufferOutputTime;
 
                         // Submit buffer for audio mixing
                     } else {
-                        Log.d(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
+                        //Log.d(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs, inputChannel.mInputOffsetUs, inputChannel.mInputStartTimeUs, inputChannel.mInputEndTimeUs);
                     }

@@ -275,7 +275,7 @@ class AudioChannel {
                 mEncoder.queueInputBuffer(mEncoderBufferIndex,
                         0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                         startingPresentationTimeUs, 0);
-                Log.d(TAG, "Submitting audio buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
+                //Log.d(TAG, "Submitting audio buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
                 mOutputPresentationTimeUs = endingPresentationTimeUs;
                 mEncoderBuffer = null;
             } else
@@ -342,7 +342,7 @@ class AudioChannel {
         inBuff.clear();
         outBuff.clear();
 
-        Log.d(TAG, "remixing buffer at " + (input.presentationTimeUs + input.presentationTimeOffsetUs) + " length " +  sampleCountToDurationUs(inBuff.remaining()));
+        //Log.d(TAG, "remixing buffer at " + (input.presentationTimeUs + input.presentationTimeOffsetUs) + " length " +  sampleCountToDurationUs(inBuff.remaining()));
 
         if (inBuff.remaining() > outBuff.remaining()) {
             // Overflow

@@ -224,6 +224,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         for (Map.Entry<String, TimeLine.SegmentChannel> segmentChannelEntry : segment.getSegmentChannels().entrySet()) {
             TimeLine.SegmentChannel segmentChannel = segmentChannelEntry.getValue();
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(segmentChannelEntry.getKey());
+            decoderWrapper.mOutputSurface.setAlpha(1.0f);
             outputSurfaces.add(decoderWrapper.mOutputSurface);
             decoderWrapper.setFilter(segmentChannel.mFilter, mOutputPresentationTimeDecodedUs, segment.getDuration());
         }

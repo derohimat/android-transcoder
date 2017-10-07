@@ -54,25 +54,27 @@ public class MediaTranscoderEngine {
      * presentation time and all decoder actions must yield a presentation time at least that
      * high or they must re-queue the buffer until they catch up
      */
-    public enum ThrottleStatus {BUFFER_UNKNOWN, BUFFER_PROCESSED, BUFFER_WAITING};
+    public enum ThrottleStatus {BUFFER_UNKNOWN, BUFFER_PROCESSED, BLOCKED_BY_THROTTLE};
     public class TranscodeThrottle {
         private Long mMaximumPresentationTime = 0l;
         private ThrottleStatus mStatus = ThrottleStatus.BUFFER_UNKNOWN;
         public boolean canProceed(Long presentationTime) {
 
+            // If not too far ahead of target allow processing
             if (presentationTime <= (mMaximumPresentationTime + 250000)) {
                 mStatus = ThrottleStatus.BUFFER_PROCESSED;
-                //mMaximumPresentationTime = presentationTime;
                 return true;
             } else {
+                // Unless we processed a buffer this pipeline step may be simply waiting
                 if (mStatus != ThrottleStatus.BUFFER_PROCESSED)
-                    mStatus = ThrottleStatus.BUFFER_WAITING;
+                    mStatus = ThrottleStatus.BLOCKED_BY_THROTTLE;
                 return false;
             }
 
         }
         public void step () {
-            if (mStatus == ThrottleStatus.BUFFER_WAITING)
+            // If everyone was blocked by throttle bump threshold
+            if (mStatus == ThrottleStatus.BLOCKED_BY_THROTTLE)
                 mMaximumPresentationTime += 100000l;
             mStatus = ThrottleStatus.BUFFER_UNKNOWN;
         }
@@ -288,10 +290,10 @@ public class MediaTranscoderEngine {
             if (mProgressCallback != null)
                 mProgressCallback.onProgress(progress); // unknown
         }
-        TimeLine.Segment prevousSegment = null;
+        TimeLine.Segment previousSegment = null;
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
-            outputSegment.start(outputPresentationTimeDecodedUs, prevousSegment);
-            prevousSegment = outputSegment;
+            outputSegment.start(outputPresentationTimeDecodedUs, previousSegment);
+            previousSegment = outputSegment;
             mAudioTrackTranscoder.setupDecoders(outputSegment);
             mVideoTrackTranscoder.setupDecoders(outputSegment);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {

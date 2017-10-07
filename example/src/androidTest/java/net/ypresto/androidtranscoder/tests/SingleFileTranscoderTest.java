@@ -223,7 +223,7 @@ public class SingleFileTranscoderTest {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
-                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch.mp4";
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch2.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
                 TimeLine timeline = new TimeLine()
@@ -242,6 +242,44 @@ public class SingleFileTranscoderTest {
                             .output("A")
                             .seek("A", 2500)
                             .timeLine();
+                (MediaTranscoder.getInstance().transcodeVideo(
+                        timeline, outputFileName,
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
+                        listener)
+                ).get();
+            }
+        });
+    }
+    @Test()
+    public void HopScotch3() {
+        runTest(new Transcode() {
+            @Override
+            public void run() throws IOException, InterruptedException, ExecutionException {
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch3.mp4";
+                cleanup(outputFileName);
+                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+                TimeLine timeline = new TimeLine()
+                        .addChannel("A0", in1.getFileDescriptor())
+                        .addChannel("A1", in1.getFileDescriptor())
+                        .addChannel("A2", in1.getFileDescriptor())
+                        .createSegment()
+                        .output("A0")
+                        .duration(3250)
+                        .timeLine().createSegment()
+                        .output("A0", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                        .output("A1", TimeLine.Filter.OPACITY_UP_RAMP)
+                        .duration(1750)
+                        .timeLine().createSegment()
+                        .output("A1")
+                        .duration(3250)
+                        .timeLine().createSegment()
+                        .output("A1", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                        .output("A2", TimeLine.Filter.OPACITY_UP_RAMP)
+                        .duration(1750)
+                        .timeLine().createSegment()
+                        .output("A2")
+                        .duration(3250)
+                        .timeLine();
                 (MediaTranscoder.getInstance().transcodeVideo(
                         timeline, outputFileName,
                         MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),

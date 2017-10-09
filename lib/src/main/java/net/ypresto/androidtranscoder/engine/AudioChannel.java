@@ -39,9 +39,6 @@ class AudioChannel {
 
     private final LinkedHashMap<String, Queue<AudioBuffer>> mEmptyBuffers;
     private final LinkedHashMap<String, Queue<AudioBuffer>> mFilledBuffers;
-
-    private final Queue<AudioBuffer> mFilledBuffers2 = new ArrayDeque<>();
-
     private final LinkedHashMap<String, MediaCodec> mDecoders;
     private final MediaCodec mEncoder;
     private final MediaFormat mEncodeFormat;
@@ -96,7 +93,11 @@ class AudioChannel {
 
         return audioChannel;
     }
-
+    public void removeBuffers(String channelName) {
+        mDecoderBuffers.remove(channelName);
+        mEmptyBuffers.remove(channelName);
+        mFilledBuffers.remove(channelName);
+    }
     public void setActualDecodedFormat(final MediaFormat decodedFormat) {
         mActualDecodedFormat = decodedFormat;
 

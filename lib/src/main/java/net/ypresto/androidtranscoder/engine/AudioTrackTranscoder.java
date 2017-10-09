@@ -172,7 +172,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             if (!decoderWrapper.mDecoderStarted) {
                 decoderWrapper.start();
             }
-            decoderWrapper.mIsSegmentEOS = false;
+            decoderWrapper.mIsSegmentEOS = decoderWrapper.mIsDecoderEOS;
             Log.d(TAG, "Audio Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + inputChannel.mInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
             decoders.put(entry.getKey(), decoderWrapper.mDecoder);
             mChannelToSyncTo = entry.getKey();
@@ -270,7 +270,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         boolean consumed = false;
 
 
-        // Go through each decoder in the segment and get it's frame into a texture
+        // Go through each decoder in the segment to get a buffer to process
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getAudioChannels().entrySet()) {
 
             String channelName = inputChannelEntry.getKey();
@@ -308,6 +308,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     decoderWrapper.mIsDecoderEOS = true;
                     segment.forceEndOfStream(mOutputPresentationTimeDecodedUs);
                     decoderWrapper.requeueOutputBuffer();
+                    mAudioChannel.removeBuffers(channelName);
                     if (mIsLastSegment)
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l);
                     Log.d(TAG, "Audio End of Stream audio " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);

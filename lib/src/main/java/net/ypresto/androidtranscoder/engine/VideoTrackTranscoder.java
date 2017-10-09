@@ -225,14 +225,17 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             TimeLine.SegmentChannel segmentChannel = segmentChannelEntry.getValue();
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(segmentChannelEntry.getKey());
             decoderWrapper.mOutputSurface.setAlpha(1.0f);
-            outputSurfaces.add(decoderWrapper.mOutputSurface);
-            decoderWrapper.setFilter(segmentChannel.mFilter, mOutputPresentationTimeDecodedUs, segment.getDuration());
+            if (!decoderWrapper.mIsDecoderEOS) {
+                outputSurfaces.add(decoderWrapper.mOutputSurface);
+                decoderWrapper.setFilter(segmentChannel.mFilter, mOutputPresentationTimeDecodedUs, segment.getDuration());
+            } else
+                decoderWrapper.mIsSegmentEOS = true;
         }
         TextureRender textureRender = new TextureRender(outputSurfaces);
         textureRender.surfaceCreated();
         mTextureRender.add(textureRender);
-        Log.d(TAG, "Surface Texture Created for " + segment.getSegmentChannels().size() + " surfaces");
-        mTextures = segment.getSegmentChannels().size();
+        Log.d(TAG, "Surface Texture Created for " + outputSurfaces.size() + " surfaces");
+        mTextures = outputSurfaces.size();
         mIsSegmentFinished = false;
         mIsEncoderEOS = false;
         mIsLastSegment = segment.isLastSegment;
@@ -427,7 +430,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             // Requeue buffer if to far ahead of other tracks
                         } else if (doRender && !throttle.canProceed(bufferOutputTime)) {
                             decoderWrapper.requeueOutputBuffer();
-                            Log.d(TAG, "RequeueOutputBuffer " + bufferOutputTime + " for video decoder " + channelName);
+                            //Log.d(TAG, "RequeueOutputBuffer " + bufferOutputTime + " for video decoder " + channelName);
                             decoderWrapper.mPresentationTimeRequeued =  bufferOutputTime;
                             consumed = false;
 
@@ -439,13 +442,13 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             decoderWrapper.filterTick(mOutputPresentationTimeDecodedUs);
                             ++mTexturesReady;
                             consumed = true;
-                            Log.d(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
+                            //Log.d(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
                             mOutputPresentationTimeDecodedUs = Math.max(bufferOutputTime, mOutputPresentationTimeDecodedUs);
                             inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
 
                             // Seeking - release it without rendering
                         } else {
-                            Log.d(TAG, "Skipping video " + (decoderWrapper.mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs) + " for decoder " + channelName);
+                            //Log.d(TAG, "Skipping video " + (decoderWrapper.mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs) + " for decoder " + channelName);
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                             inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         }
@@ -466,7 +469,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             for (TextureRender textureRender : mTextureRender) {
                 textureRender.drawFrame();
             }
-            Log.d(TAG, "Encoded video " + mOutputPresentationTimeDecodedUs + " for decoder ");
+            //Log.d(TAG, "Encoded video " + mOutputPresentationTimeDecodedUs + " for decoder ");
             mEncoderInputSurfaceWrapper.setPresentationTime(mOutputPresentationTimeDecodedUs * 1000);
             mEncoderInputSurfaceWrapper.swapBuffers();
             mOutputPresentationTimeDecodedUs += 1; // Hack to ensure next one greater than current;

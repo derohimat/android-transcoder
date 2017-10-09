@@ -26,6 +26,7 @@ import net.ypresto.androidtranscoder.utils.MediaExtractorUtils;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -54,29 +55,63 @@ public class MediaTranscoderEngine {
      * presentation time and all decoder actions must yield a presentation time at least that
      * high or they must re-queue the buffer until they catch up
      */
-    public enum ThrottleStatus {BUFFER_UNKNOWN, BUFFER_PROCESSED, BLOCKED_BY_THROTTLE};
+    private long ThrottleLimit = 250000l;
+    private long ThrottleSeed = 24l * 60l * 60l * 1000000l;
+    private long maxBlockTime = 5000000l;
     public class TranscodeThrottle {
-        private Long mMaximumPresentationTime = 0l;
-        private ThrottleStatus mStatus = ThrottleStatus.BUFFER_UNKNOWN;
-        public boolean canProceed(Long presentationTime) {
+        private long mPresentationThreshold = ThrottleLimit;
+        private Date mBlockedStartTime = null;
+        private boolean mBufferProcessed = false;
+        private boolean mShouldCancel = false;
+        LinkedHashMap <String, Long> mLowestPresentationTime;
+
+        public void participate (String channel) {
+            mLowestPresentationTime.put(channel, null);
+        }
+        public void remove (String channel) {
+            mLowestPresentationTime.remove(channel);
+        }
+        public void startSegment() {
+            mLowestPresentationTime = new LinkedHashMap<String, Long>();
+        }
+
+        public boolean canProceed(String channel, long presentationTime) {
+
+            mLowestPresentationTime.put(channel, presentationTime);
 
             // If not too far ahead of target allow processing
-            if (presentationTime <= (mMaximumPresentationTime + 250000)) {
-                mStatus = ThrottleStatus.BUFFER_PROCESSED;
-                return true;
-            } else {
-                // Unless we processed a buffer this pipeline step may be simply waiting
-                if (mStatus != ThrottleStatus.BUFFER_PROCESSED)
-                    mStatus = ThrottleStatus.BLOCKED_BY_THROTTLE;
+            if (presentationTime <= mPresentationThreshold) {
+                    mBufferProcessed = true;
+                    return true;
+            } else
                 return false;
-            }
-
         }
-        public void step () {
-            // If everyone was blocked by throttle bump threshold
-            if (mStatus == ThrottleStatus.BLOCKED_BY_THROTTLE)
-                mMaximumPresentationTime += 100000l;
-            mStatus = ThrottleStatus.BUFFER_UNKNOWN;
+
+        public void step() {
+            long newPresentationThreshold = ThrottleSeed;
+            boolean allChannelsReporting = true;
+            for (Map.Entry<String, Long> entry : mLowestPresentationTime.entrySet()) {
+                if (entry.getValue() == null)
+                    allChannelsReporting = false;
+                else if (entry.getValue() < newPresentationThreshold)
+                    newPresentationThreshold = entry.getValue();
+            }
+            if (allChannelsReporting) {
+                mPresentationThreshold = newPresentationThreshold + ThrottleLimit;
+                mLowestPresentationTime = new LinkedHashMap<String, Long>();
+            }
+            if (!mBufferProcessed) {
+                if (mBlockedStartTime == null)
+                    mBlockedStartTime = new Date();
+                else
+                    mShouldCancel = ((new Date()).getTime() > mBlockedStartTime.getTime() + maxBlockTime);
+            } else {
+                mShouldCancel = false;
+                mBlockedStartTime = null;
+            }
+        }
+        public boolean shouldCancel() {
+            return mShouldCancel;
         }
     }
     private TranscodeThrottle mThrottle  = new TranscodeThrottle();
@@ -280,7 +315,7 @@ public class MediaTranscoderEngine {
         mAudioTrackTranscoder.setupEncoder();
     }
 
-    private void runPipelines(TimeLine timeLine) throws IOException {
+    private void runPipelines(TimeLine timeLine) throws IOException, InterruptedException {
         long loopCount = 0;
         long outputPresentationTimeDecodedUs = 0l;
         long outputSyncTimeUs = 0l;
@@ -294,8 +329,9 @@ public class MediaTranscoderEngine {
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
             outputSegment.start(outputPresentationTimeDecodedUs, previousSegment);
             previousSegment = outputSegment;
-            mAudioTrackTranscoder.setupDecoders(outputSegment);
-            mVideoTrackTranscoder.setupDecoders(outputSegment);
+            mThrottle.startSegment();
+            mAudioTrackTranscoder.setupDecoders(outputSegment, mThrottle);
+            mVideoTrackTranscoder.setupDecoders(outputSegment, mThrottle);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
 
                boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment, mThrottle) ||
@@ -318,9 +354,14 @@ public class MediaTranscoderEngine {
                     }
                 }
                 mThrottle.step();
+                if (mThrottle.shouldCancel()) {
+                    Log.d(TAG, "Cancel because of waiting for buffer");
+                    throw new IllegalStateException("Timed out waiting for buffer");
+                }
             }
 
         }
+        Log.d(TAG, "Releasing transcoders");
         mVideoTrackTranscoder.release();
         mAudioTrackTranscoder.release();
         Log.d(TAG, "Transcoders released last video presentation time decoded was " +

@@ -234,13 +234,12 @@ public class SingleFileTranscoderTest {
                             .duration(1000)
                         .timeLine().createSegment()
                             .output("A", TimeLine.Filter.OPACITY_DOWN_RAMP)
-                            .seek("B", 2000)
+                            .seek("B", 1000)
                             .output("B", TimeLine.Filter.OPACITY_UP_RAMP)
                             .duration(500)
                         .timeLine().createSegment()
                             .duration(1500)
                             .output("A")
-                            .seek("A", 2500)
                             .timeLine();
                 (MediaTranscoder.getInstance().transcodeVideo(
                         timeline, outputFileName,
@@ -288,7 +287,52 @@ public class SingleFileTranscoderTest {
             }
         });
     }
-
+/*
+@Test()
+public void ThreeFiles() {
+    runTest(new Transcode() {
+        @Override
+        public void run() throws IOException, InterruptedException, ExecutionException {
+            String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_threefiles.mp4";
+            cleanup(outputFileName);
+            ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171005_113258.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
+            ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171005_112555.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
+            ParcelFileDescriptor in3 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171005_113905.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
+            TimeLine timeline = new TimeLine()
+                    .addChannel("A1", in1.getFileDescriptor())
+                    .addChannel("A2", in2.getFileDescriptor())
+                    .addChannel("A3", in3.getFileDescriptor())
+                    .createSegment()
+                        .output("A1")
+                        .duration(11964)
+                        .timeLine()
+                    .createSegment()
+                        .output("A1", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                        .output("A2", TimeLine.Filter.OPACITY_UP_RAMP)
+                        .duration(750)
+                        .timeLine()
+                    .createSegment()
+                        .output("A2")
+                        .duration(11815)
+                        .timeLine()
+                    .createSegment()
+                        .output("A2", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                        .output("A3", TimeLine.Filter.OPACITY_UP_RAMP)
+                        .duration(750)
+                        .timeLine()
+                    .createSegment()
+                        .output("A3")
+                        .duration(6994)
+                        .timeLine();
+              (MediaTranscoder.getInstance().transcodeVideo(
+                    timeline, outputFileName,
+                    MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
+                    listener)
+            ).get();
+        }
+    });
+}
+*/
     public interface Transcode {
         void run () throws IOException, InterruptedException, ExecutionException;
     }

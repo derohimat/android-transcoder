@@ -1,5 +1,7 @@
 package net.ypresto.androidtranscoder.engine;
 
+import android.util.Log;
+
 import java.io.FileDescriptor;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -45,6 +47,7 @@ import java.util.Map;
  * TimeLine also contains inputChannels which may be assigned to each segment
  */
 public class TimeLine {
+    private static final String TAG = "TimeLine";
 
     static long TO_END_OF_FILE = -1;
     private List<Segment> mSegments = new ArrayList<Segment>();
@@ -52,6 +55,7 @@ public class TimeLine {
     public TimeLine () {}
 
     public Segment createSegment() {
+        Log.i(TAG, "createSegment: ");
         for (Segment segment : mSegments)
             segment.isLastSegment = false;
         Segment segment = new Segment(this);
@@ -82,6 +86,7 @@ public class TimeLine {
      * @return
      */
     public TimeLine addChannel(String inputChannel, FileDescriptor inputFileDescriptor) {
+        Log.i(TAG, "addChannel: " + inputChannel + ":" + inputFileDescriptor.toString());
         mTimeLineChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.AUDIO_VIDEO));
         return this;
     }
@@ -95,6 +100,7 @@ public class TimeLine {
      * @return
      */
     public TimeLine addImageChannel(String inputChannel, FileDescriptor inputFileDescriptor) {
+        Log.i(TAG, "addChannel (image): " + inputChannel + ":" + inputFileDescriptor.toString());
         mTimeLineChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.IMAGE));
         return this;
     }
@@ -107,6 +113,7 @@ public class TimeLine {
      * @return
      */
     public TimeLine addVideoOnlyChannel(String inputChannel, FileDescriptor inputFileDescriptor) {
+        Log.i(TAG, "addChannel (video only): " + inputChannel + ":" + inputFileDescriptor.toString());
         mTimeLineChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.VIDEO));
         return this;
     }
@@ -119,6 +126,7 @@ public class TimeLine {
      * @return
      */
     public TimeLine addAudioOnlyChannel(String inputChannel, FileDescriptor inputFileDescriptor) {
+        Log.i(TAG, "addChannel (audio only): " + inputChannel + ":" + inputFileDescriptor.toString());
         mTimeLineChannels.put(inputChannel, new InputChannel(inputFileDescriptor, ChannelType.AUDIO));
         return this;
     }
@@ -132,6 +140,7 @@ public class TimeLine {
      * @return
      */
     public TimeLine addChannel(String inputChannel, FileDescriptor inputFileDescriptor, ChannelType channelType) {
+        Log.i(TAG, "addChannel (" + channelType + "): " + inputChannel + ":" + inputFileDescriptor.toString());
         mTimeLineChannels.put(inputChannel, new InputChannel(inputFileDescriptor, channelType));
         return this;
     }
@@ -288,6 +297,7 @@ public class TimeLine {
          * @return
          */
         public Segment duration(long time) {
+            Log.i(TAG, "duration: " + time);
             this.mDuration = time * 1000l;
             return this;
         }
@@ -299,6 +309,7 @@ public class TimeLine {
          * @return
          */
         public Segment seek(String channel, long time) {
+            Log.i(TAG, "seek: " + channel + " " + time);
             this.mSeeks.put(channel, time * 1000l);
             return this;
         }
@@ -309,6 +320,7 @@ public class TimeLine {
          * @param inputChannelName
          */
         public Segment output(String inputChannelName) {
+            Log.i(TAG, "output: " + inputChannelName);
             InputChannel inputChannel = mTimeLineChannels.get(inputChannelName);
             if (inputChannel.mChannelType != ChannelType.AUDIO)
                 mSegmentChannels.put(inputChannelName, new SegmentChannel(inputChannel, null));
@@ -322,6 +334,7 @@ public class TimeLine {
          * @param filter
          */
         public Segment output(String inputChannelName, Filter filter) {
+            Log.i(TAG, "output: " + inputChannelName + " with " + filter);
             InputChannel inputChannel = mTimeLineChannels.get(inputChannelName);
             mSegmentChannels.put(inputChannelName, new SegmentChannel(inputChannel, filter));
             return this;

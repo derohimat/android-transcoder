@@ -51,7 +51,7 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
     }
 
     @Override
-    public void setupDecoders(TimeLine.Segment segment) {
+    public void setupDecoders(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle) {
     }
 
     @Override

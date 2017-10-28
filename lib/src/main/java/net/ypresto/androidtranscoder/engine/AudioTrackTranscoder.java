@@ -151,7 +151,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
     }
     @Override
-    public void setupDecoders(TimeLine.Segment segment) {
+    public void setupDecoders(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle) {
 
         Log.d(TAG, "Setting up Audio Decoders for segment at " + segment.mOutputStartTimeUs + " for a duration of " + segment.getDuration());
 
@@ -168,11 +168,12 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                 createWrapperSlot(segment);
                 decoderWrapper = new DecoderWrapper(mExtractors.get(channelName));
                 mDecoderWrappers.put(channelName, decoderWrapper);
+                throttle.participate("Audio" + channelName);
             }
             if (!decoderWrapper.mDecoderStarted) {
                 decoderWrapper.start();
             }
-            decoderWrapper.mIsSegmentEOS = false;
+            decoderWrapper.mIsSegmentEOS = decoderWrapper.mIsDecoderEOS;
             Log.d(TAG, "Audio Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + inputChannel.mInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
             decoders.put(entry.getKey(), decoderWrapper.mDecoder);
             mChannelToSyncTo = entry.getKey();
@@ -207,7 +208,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
         while ((presentationTimeUs = mAudioChannel.feedEncoder(0)) != null) {
             if (presentationTimeUs >= 0) {
-                Log.d(TAG, "Encoded audio from " + mOutputPresentationTimeDecodedUs + " to " + presentationTimeUs);
+                //Log.d(TAG, "Encoded audio from " + mOutputPresentationTimeDecodedUs + " to " + presentationTimeUs);
                 mOutputPresentationTimeDecodedUs = Math.max(mOutputPresentationTimeDecodedUs, presentationTimeUs);
             } else {
                 for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
@@ -270,7 +271,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         boolean consumed = false;
 
 
-        // Go through each decoder in the segment and get it's frame into a texture
+        // Go through each decoder in the segment to get a buffer to process
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getAudioChannels().entrySet()) {
 
             String channelName = inputChannelEntry.getKey();
@@ -279,13 +280,14 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
             // Only process if we have not end end of stream for this decoder or extractor
             if (!decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS &&
-                (decoderWrapper.mPresentationTimeRequeued == null || throttle.canProceed(decoderWrapper.mPresentationTimeRequeued))) {
+                (decoderWrapper.mPresentationTimeRequeued == null || throttle.canProceed("Audio" + channelName, decoderWrapper.mPresentationTimeRequeued))) {
                 decoderWrapper.mPresentationTimeRequeued =  null;
 
                 if (inputChannel.mInputEndTimeUs != null &&
                         mOutputPresentationTimeDecodedUs - inputChannel.mInputOffsetUs > inputChannel.mInputEndTimeUs) {
                     decoderWrapper.mIsSegmentEOS = true;
                     Log.d(TAG, "End of segment audio " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
+                    throttle.remove("Audio" + channelName);
                     continue;
                 }
 
@@ -308,9 +310,11 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     decoderWrapper.mIsDecoderEOS = true;
                     segment.forceEndOfStream(mOutputPresentationTimeDecodedUs);
                     decoderWrapper.requeueOutputBuffer();
+                    mAudioChannel.removeBuffers(channelName);
                     if (mIsLastSegment)
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l);
                     Log.d(TAG, "Audio End of Stream audio " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
+                    throttle.remove("Audio" + channelName);
 
                 // Process a buffer with data
                 } else if (decoderWrapper.mBufferInfo.size > 0) {
@@ -319,18 +323,18 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     if (bufferInputStartTime < inputChannel.mInputStartTimeUs) {
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
-                        Log.d(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
+                        //Log.d(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
 
                     // Requeue buffer if to far ahead of other tracks
-                    } else if (!throttle.canProceed(bufferOutputTime)) {
+                    } else if (!throttle.canProceed("Audio" + channelName, bufferOutputTime)) {
                         decoderWrapper.requeueOutputBuffer();
-                        Log.d(TAG, "Requeue Audio Buffer " + bufferOutputTime + " for decoder " + channelName);
+                        //Log.d(TAG, "Requeue Audio Buffer " + bufferOutputTime + " for decoder " + channelName);
                         consumed = false;
                         decoderWrapper.mPresentationTimeRequeued =  bufferOutputTime;
 
                         // Submit buffer for audio mixing
                     } else {
-                        Log.d(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
+                        //Log.d(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs, inputChannel.mInputOffsetUs, inputChannel.mInputStartTimeUs, inputChannel.mInputEndTimeUs);
                     }
@@ -422,6 +426,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     }
     @Override
     public void releaseEncoder() {
+        Log.d(TAG, "ReleaseEncoder");
         if (mEncoder != null) {
             if (mEncoderStarted) mEncoder.stop();
             mEncoder.release();

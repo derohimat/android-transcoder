@@ -39,9 +39,6 @@ class AudioChannel {
 
     private final LinkedHashMap<String, Queue<AudioBuffer>> mEmptyBuffers;
     private final LinkedHashMap<String, Queue<AudioBuffer>> mFilledBuffers;
-
-    private final Queue<AudioBuffer> mFilledBuffers2 = new ArrayDeque<>();
-
     private final LinkedHashMap<String, MediaCodec> mDecoders;
     private final MediaCodec mEncoder;
     private final MediaFormat mEncodeFormat;
@@ -96,7 +93,11 @@ class AudioChannel {
 
         return audioChannel;
     }
-
+    public void removeBuffers(String channelName) {
+        mDecoderBuffers.remove(channelName);
+        mEmptyBuffers.remove(channelName);
+        mFilledBuffers.remove(channelName);
+    }
     public void setActualDecodedFormat(final MediaFormat decodedFormat) {
         mActualDecodedFormat = decodedFormat;
 
@@ -226,6 +227,7 @@ class AudioChannel {
         if (mEncoderBuffer == null) {
            mEncoderBufferIndex = mEncoder.dequeueInputBuffer(timeoutUs);
             if (mEncoderBufferIndex < 0) {
+                Log.d(TAG, "Encoder full");
                 // Encoder is full - Bail out
                 return null;
             }
@@ -265,6 +267,7 @@ class AudioChannel {
         if (!streamPresent) {
             mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
             mEncoderBuffer = null;
+            Log.d(TAG, "No stream present");
             return null;
         } else {
             if (mEncoderBuffer.limit() > 0) {
@@ -278,8 +281,10 @@ class AudioChannel {
                 //Log.d(TAG, "Submitting audio buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
                 mOutputPresentationTimeUs = endingPresentationTimeUs;
                 mEncoderBuffer = null;
-            } else
+            } else {
+                Log.d(TAG, "Ignoring buffer");
                 return -1l; // ignore it
+            }
             return endingPresentationTimeUs;
         }
     }

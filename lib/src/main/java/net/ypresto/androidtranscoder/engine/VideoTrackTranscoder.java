@@ -143,7 +143,6 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private boolean mEncoderStarted;
     private int mTexturesReady = 0;
     private int mTextures = 0;
-    private String mChannelToSyncTo = "";
     private long mOutputPresentationTimeDecodedUs = 0l;
     private long mPreviousOutputPresentationTimeDecodedUs = 0l;
     private List <TextureRender> mTextureRender;
@@ -215,7 +214,6 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             if (!decoderWrapper.mDecoderStarted)
                 decoderWrapper.start();
             Log.d(TAG, "Video Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + (inputChannel.mInputStartTimeUs + inputChannel.mInputOffsetUs) + " ending at " + (inputChannel.mInputEndTimeUs == null ? "EOS" : inputChannel.mInputEndTimeUs + inputChannel.mInputOffsetUs));
-            mChannelToSyncTo = channelName;
         }
 
         // Create array of texture renderers for each patch in the segment
@@ -269,15 +267,6 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     @Override
     public long getOutputPresentationTimeDecodedUs() {
         return mOutputPresentationTimeDecodedUs;
-    }
-
-    @Override
-    public String getSyncChannel () {
-        return mChannelToSyncTo;
-    }
-    @Override
-    public void setSyncChannel(String syncChannel) {
-        mChannelToSyncTo = syncChannel;
     }
 
     @Override

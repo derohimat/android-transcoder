@@ -46,7 +46,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     private boolean mIsSegmentFinished;
     private boolean mIsLastSegment = false;
     private long mOutputPresentationTimeDecodedUs = 0l;
-    private String mChannelToSyncTo = "";
     private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
 
     public AudioTrackTranscoder(LinkedHashMap<String, MediaExtractor> extractor,
@@ -155,7 +154,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
         Log.d(TAG, "Setting up Audio Decoders for segment at " + segment.mOutputStartTimeUs + " for a duration of " + segment.getDuration());
 
-
         LinkedHashMap<String, MediaCodec> decoders = new LinkedHashMap<String, MediaCodec>();
 
         // Start any decoders being opened for the first time
@@ -173,10 +171,13 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             if (!decoderWrapper.mDecoderStarted) {
                 decoderWrapper.start();
             }
-            decoderWrapper.mIsSegmentEOS = decoderWrapper.mIsDecoderEOS;
-            Log.d(TAG, "Audio Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + inputChannel.mInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
-            decoders.put(entry.getKey(), decoderWrapper.mDecoder);
-            mChannelToSyncTo = entry.getKey();
+            if (decoderWrapper.mIsDecoderEOS) {
+                Log.d(TAG, "Audio Decoder " + channelName + " is at EOS -- dropping");
+            } else {
+                Log.d(TAG, "Audio Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + inputChannel.mInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
+                decoderWrapper.mIsSegmentEOS = false;
+                decoders.put(entry.getKey(), decoderWrapper.mDecoder);
+            }
         }
 
         // Setup an audio channel that will mix from multiple decoders
@@ -270,7 +271,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
         boolean consumed = false;
 
-
         // Go through each decoder in the segment to get a buffer to process
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getAudioChannels().entrySet()) {
 
@@ -334,9 +334,10 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
                         // Submit buffer for audio mixing
                     } else {
-                        //Log.d(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
+                        Log.d(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
-                        mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs, inputChannel.mInputOffsetUs, inputChannel.mInputStartTimeUs, inputChannel.mInputEndTimeUs);
+                        mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,
+                                inputChannel.mInputOffsetUs, inputChannel.mInputStartTimeUs, inputChannel.mInputEndTimeUs);
                     }
                 }
             }
@@ -402,15 +403,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     @Override
     public long getOutputPresentationTimeDecodedUs() {
         return mOutputPresentationTimeDecodedUs;
-    }
-
-    @Override
-    public String getSyncChannel () {
-        return mChannelToSyncTo;
-    }
-    @Override
-    public void setSyncChannel(String syncChannel) {
-        mChannelToSyncTo = syncChannel;
     }
 
     @Override

@@ -212,14 +212,15 @@ class AudioChannel {
 
         // Determine whether we have an overflow buffer or filled buffer to process
         final boolean hasOverflow = mOverflowBuffer.data != null && mOverflowBuffer.data.hasRemaining();
-        boolean isFilled = true;
+        boolean areAllFilled = true;
+        // All channels must have filled buffers before we mix down
         for (Map.Entry<String, Queue<AudioBuffer>> entry : mFilledBuffers.entrySet()) {
             if (entry.getValue().isEmpty()) {
-                isFilled = false;
+                areAllFilled = false;
             }
         }
-        if (!isFilled && !hasOverflow) {
-            // No audio data - Bail out
+        if (!areAllFilled && !hasOverflow) {
+            // Not all channel's buffers filled so just hang tight 'till they are
             return null;
         }
 
@@ -265,9 +266,9 @@ class AudioChannel {
             }
         }
         if (!streamPresent) {
-            mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+            //mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
             mEncoderBuffer = null;
-            Log.d(TAG, "No stream present");
+            Log.d(TAG, "No stream present - signaling end of stream to encoder");
             return null;
         } else {
             if (mEncoderBuffer.limit() > 0) {

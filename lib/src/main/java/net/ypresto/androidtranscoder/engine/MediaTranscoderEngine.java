@@ -19,7 +19,7 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaMuxer;
-import android.util.Log;
+import net.ypresto.androidtranscoder.TLog;
 
 import net.ypresto.androidtranscoder.format.MediaFormatStrategy;
 import net.ypresto.androidtranscoder.utils.MediaExtractorUtils;
@@ -164,7 +164,7 @@ public class MediaTranscoderEngine {
             setupMetadata();
             runPipelines(timeLine);
             mMuxer.stop();
-            Log.d(TAG, "Muxer Stopped");
+            TLog.d(TAG, "Muxer Stopped");
         } finally {
             try {
                 if (mVideoTrackTranscoder != null) {
@@ -192,7 +192,7 @@ public class MediaTranscoderEngine {
                     mMuxer = null;
                 }
             } catch (RuntimeException e) {
-                Log.e(TAG, "Failed to release muxer.", e);
+                TLog.e(TAG, "Failed to release muxer.", e);
             }
         }
     }
@@ -244,7 +244,7 @@ public class MediaTranscoderEngine {
                 try {
                     videoExtractor.setDataSource(fileDescriptor);
                 } catch (IOException e) {
-                    Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
+                    TLog.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
                     throw e;
                 }
                 trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(videoExtractor);
@@ -263,7 +263,7 @@ public class MediaTranscoderEngine {
                     } catch (NumberFormatException e) {
                         duration = -1l;
                     }
-                    Log.d(TAG, "Duration of " + channelName + ": (us): " + duration);
+                    TLog.d(TAG, "Duration of " + channelName + ": (us): " + duration);
                     inputChannelEntry.getValue().mLengthUs = duration;
                 }
             }
@@ -272,7 +272,7 @@ public class MediaTranscoderEngine {
                 try {
                     audioExtractor.setDataSource(fileDescriptor);
                 } catch (IOException e) {
-                    Log.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
+                    TLog.w(TAG, "Transcode failed: input file (fd: " + fileDescriptor.toString() + ") not found");
                     throw e;
                 }
                 trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(audioExtractor);
@@ -286,7 +286,7 @@ public class MediaTranscoderEngine {
             }
         }
         mDurationUs = timeLine.getDuration();
-        Log.d(TAG, "Total duration " + mDurationUs);
+        TLog.d(TAG, "Total duration " + mDurationUs);
         if (videoOutputFormat == null && audioOutputFormat == null) {
             throw new InvalidOutputFormatException("MediaFormatStrategy returned pass-through for both video and audio. No transcoding is necessary.");
         }
@@ -355,16 +355,16 @@ public class MediaTranscoderEngine {
                 }
                 mThrottle.step();
                 if (mThrottle.shouldCancel()) {
-                    Log.d(TAG, "Cancel because of waiting for buffer");
+                    TLog.d(TAG, "Cancel because of waiting for buffer");
                     throw new IllegalStateException("Timed out waiting for buffer");
                 }
             }
 
         }
-        Log.d(TAG, "Releasing transcoders");
+        TLog.d(TAG, "Releasing transcoders");
         mVideoTrackTranscoder.release();
         mAudioTrackTranscoder.release();
-        Log.d(TAG, "Transcoders released last video presentation time decoded was " +
+        TLog.d(TAG, "Transcoders released last video presentation time decoded was " +
                 Math.max(mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(),
                          mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs()));
     }

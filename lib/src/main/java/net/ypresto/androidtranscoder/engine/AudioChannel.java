@@ -2,7 +2,7 @@ package net.ypresto.androidtranscoder.engine;
 
 import android.media.MediaCodec;
 import android.media.MediaFormat;
-import android.util.Log;
+import net.ypresto.androidtranscoder.TLog;
 
 import net.ypresto.androidtranscoder.compat.MediaCodecBufferCompatWrapper;
 
@@ -228,7 +228,7 @@ class AudioChannel {
         if (mEncoderBuffer == null) {
            mEncoderBufferIndex = mEncoder.dequeueInputBuffer(timeoutUs);
             if (mEncoderBufferIndex < 0) {
-                Log.d(TAG, "Encoder full");
+                TLog.d(TAG, "Encoder full");
                 // Encoder is full - Bail out
                 return null;
             }
@@ -241,7 +241,7 @@ class AudioChannel {
             mEncoder.queueInputBuffer(mEncoderBufferIndex,
                     0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                     presentationTimeUs, 0);
-            Log.d(TAG, "Submitting audio overflow buffer at " + presentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
+            TLog.d(TAG, "Submitting audio overflow buffer at " + presentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
             presentationTimeUs += sampleCountToDurationUs(mEncoderBuffer.position());
             mEncoderBuffer = null;
             return presentationTimeUs;
@@ -268,7 +268,7 @@ class AudioChannel {
         if (!streamPresent) {
             //mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
             mEncoderBuffer = null;
-            Log.d(TAG, "No stream present - signaling end of stream to encoder");
+            TLog.d(TAG, "No stream present - signaling end of stream to encoder");
             return null;
         } else {
             if (mEncoderBuffer.limit() > 0) {
@@ -279,11 +279,11 @@ class AudioChannel {
                 mEncoder.queueInputBuffer(mEncoderBufferIndex,
                         0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                         startingPresentationTimeUs, 0);
-                //Log.d(TAG, "Submitting audio buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
+                TLog.d(TAG, "Submitting audio buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
                 mOutputPresentationTimeUs = endingPresentationTimeUs;
                 mEncoderBuffer = null;
             } else {
-                Log.d(TAG, "Ignoring buffer");
+                TLog.d(TAG, "Ignoring buffer");
                 return -1l; // ignore it
             }
             return endingPresentationTimeUs;
@@ -348,7 +348,7 @@ class AudioChannel {
         inBuff.clear();
         outBuff.clear();
 
-        //Log.d(TAG, "remixing buffer at " + (input.presentationTimeUs + input.presentationTimeOffsetUs) + " length " +  sampleCountToDurationUs(inBuff.remaining()));
+        TLog.d(TAG, "remixing buffer at " + (input.presentationTimeUs + input.presentationTimeOffsetUs) + " length " +  sampleCountToDurationUs(inBuff.remaining()));
 
         if (inBuff.remaining() > outBuff.remaining()) {
             // Overflow

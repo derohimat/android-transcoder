@@ -24,7 +24,7 @@ import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
 import android.opengl.EGLSurface;
 import android.opengl.GLES20;
-import android.util.Log;
+import net.ypresto.androidtranscoder.TLog;
 import android.view.Surface;
 
 /**
@@ -91,7 +91,7 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         // still need to keep a reference to it.  The Surface doesn't retain a reference
         // at the Java level, so if we don't either then the object can get GCed, which
         // causes the native finalizer to run.
-        if (VERBOSE) Log.d(TAG, "textureID=" + mTextureID);
+        if (VERBOSE) TLog.d(TAG, "textureID=" + mTextureID);
         mSurfaceTexture = new SurfaceTexture(mTextureID);
         // This doesn't work if OutputSurface is created on the thread that CTS started for
         // these test cases.
@@ -242,7 +242,7 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
 
     @Override
     public void onFrameAvailable(SurfaceTexture st) {
-        if (VERBOSE) Log.d(TAG, "new frame available");
+        if (VERBOSE) TLog.d(TAG, "new frame available");
         synchronized (mFrameSyncObject) {
             if (mFrameAvailable) {
                 throw new RuntimeException("mFrameAvailable already set, frame could be dropped");
@@ -263,7 +263,7 @@ class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     public void checkGlError(String op) {
         int error;
         while ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
-            Log.e(TAG, op + ": glError " + error);
+            TLog.e(TAG, op + ": glError " + error);
             throw new RuntimeException(op + ": glError " + error);
         }
     }

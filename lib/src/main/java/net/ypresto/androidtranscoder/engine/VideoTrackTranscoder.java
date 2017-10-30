@@ -18,7 +18,7 @@ package net.ypresto.androidtranscoder.engine;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
-import android.util.Log;
+import net.ypresto.androidtranscoder.TLog;
 
 import net.ypresto.androidtranscoder.format.MediaFormatExtraConstants;
 import net.ypresto.androidtranscoder.utils.MediaExtractorUtils;
@@ -183,7 +183,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                 decoderWrapperEntry.getValue().release();
                 segment.timeLine().getChannels().get(decoderWrapperEntry.getKey()).mInputEndTimeUs = 0l;
                 iterator.remove();
-                Log.d(TAG, "Releasing Video Decoder " + decoderWrapperEntry.getKey());
+                TLog.d(TAG, "Releasing Video Decoder " + decoderWrapperEntry.getKey());
                 return;
             }
         }
@@ -197,7 +197,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     @Override
     public void setupDecoders(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle) {
 
-        Log.d(TAG, "Setting up Video Decoders for segment at " + segment.mOutputStartTimeUs + " for a duration of " + segment.getDuration());
+        TLog.d(TAG, "Setting up Video Decoders for segment at " + segment.mOutputStartTimeUs + " for a duration of " + segment.getDuration());
 
           // Start any decoders being opened for the first time
 
@@ -213,7 +213,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             decoderWrapper.mIsSegmentEOS = false;
             if (!decoderWrapper.mDecoderStarted)
                 decoderWrapper.start();
-            Log.d(TAG, "Video Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + (inputChannel.mInputStartTimeUs + inputChannel.mInputOffsetUs) + " ending at " + (inputChannel.mInputEndTimeUs == null ? "EOS" : inputChannel.mInputEndTimeUs + inputChannel.mInputOffsetUs));
+            TLog.d(TAG, "Video Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + (inputChannel.mInputStartTimeUs + inputChannel.mInputOffsetUs) + " ending at " + (inputChannel.mInputEndTimeUs == null ? "EOS" : inputChannel.mInputEndTimeUs + inputChannel.mInputOffsetUs));
         }
 
         // Create array of texture renderers for each patch in the segment
@@ -234,7 +234,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         TextureRender textureRender = new TextureRender(outputSurfaces);
         textureRender.surfaceCreated();
         mTextureRender.add(textureRender);
-        Log.d(TAG, "Surface Texture Created for " + outputSurfaces.size() + " surfaces");
+        TLog.d(TAG, "Surface Texture Created for " + outputSurfaces.size() + " surfaces");
         mTextures = outputSurfaces.size();
         mIsSegmentFinished = false;
         mIsEncoderEOS = false;
@@ -277,7 +277,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     // TODO: CloseGuard
     @Override
     public void releaseEncoder() {
-        Log.d(TAG, "ReleaseEncoder");
+        TLog.d(TAG, "ReleaseEncoder");
         if (mEncoderInputSurfaceWrapper != null) {
             mEncoderInputSurfaceWrapper.release();
             mEncoderInputSurfaceWrapper = null;
@@ -388,7 +388,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             continue;
                         case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
                         case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
-                            Log.d(TAG, "INFO_OUTPUT_BUFFERS_CHANGED for decoder " + channelName);
+                            TLog.d(TAG, "INFO_OUTPUT_BUFFERS_CHANGED for decoder " + channelName);
                             return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
                     }
                     consumed = true;
@@ -403,7 +403,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                         decoderWrapper.mOutputSurface.signalEndOfInputStream();
                         decoderWrapper.mIsDecoderEOS = true;
                         segment.forceEndOfStream(mOutputPresentationTimeDecodedUs + 1);
-                        Log.d(TAG, "End of Stream video " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
+                        TLog.d(TAG, "End of Stream video " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
                         mTextures = 1; // Write if there is a texture
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                         throttle.remove("Video" + channelName);
@@ -417,14 +417,14 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                         if (doRender && inputChannel.mInputEndTimeUs != null && bufferInputStartTime >= inputChannel.mInputEndTimeUs) {
                             decoderWrapper.requeueOutputBuffer();
                             decoderWrapper.mIsSegmentEOS = true;
-                            Log.d(TAG, "End of Segment video " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs + " for video decoder " + channelName);
+                            TLog.d(TAG, "End of Segment video " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs + " for video decoder " + channelName);
                             mTextures = 1; // Write if there is a texture
                             throttle.remove("Video" + channelName);
 
                             // Requeue buffer if to far ahead of other tracks
                         } else if (doRender && !throttle.canProceed("Video" + channelName, bufferOutputTime)) {
                             decoderWrapper.requeueOutputBuffer();
-                            //Log.d(TAG, "RequeueOutputBuffer " + bufferOutputTime + " for video decoder " + channelName);
+                            TLog.d(TAG, "RequeueOutputBuffer " + bufferOutputTime + " for video decoder " + channelName);
                             decoderWrapper.mPresentationTimeRequeued =  bufferOutputTime;
                             consumed = false;
 
@@ -436,13 +436,13 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             decoderWrapper.filterTick(mOutputPresentationTimeDecodedUs);
                             ++mTexturesReady;
                             consumed = true;
-                            //Log.d(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
+                            TLog.d(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
                             mOutputPresentationTimeDecodedUs = Math.max(bufferOutputTime, mOutputPresentationTimeDecodedUs);
                             inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
 
                             // Seeking - release it without rendering
                         } else {
-                            //Log.d(TAG, "Skipping video " + (decoderWrapper.mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs) + " for decoder " + channelName);
+                            TLog.d(TAG, "Skipping video " + (decoderWrapper.mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs) + " for decoder " + channelName);
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                             inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         }
@@ -463,7 +463,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             for (TextureRender textureRender : mTextureRender) {
                 textureRender.drawFrame();
             }
-            //Log.d(TAG, "Encoded video " + mOutputPresentationTimeDecodedUs + " for decoder ");
+            TLog.d(TAG, "Encoded video " + mOutputPresentationTimeDecodedUs + " for decoder ");
             mEncoderInputSurfaceWrapper.setPresentationTime(mOutputPresentationTimeDecodedUs * 1000);
             mEncoderInputSurfaceWrapper.swapBuffers();
             mOutputPresentationTimeDecodedUs += 1; // Hack to ensure next one greater than current;

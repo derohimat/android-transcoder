@@ -320,7 +320,8 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
         for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getVideoChannels().entrySet()) {
 
-            DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
+            String channelName = inputChannelEntry.getKey();
+            DecoderWrapper decoderWrapper = mDecoderWrappers.get(channelName);
             if (!decoderWrapper.mIsExtractorEOS) {
 
                 // Find out which track the extractor has samples for next
@@ -349,10 +350,20 @@ public class VideoTrackTranscoder implements TrackTranscoder {
 
                 // Get the sample into the buffer
                 int sampleSize = decoderWrapper.mExtractor.readSampleData(decoderWrapper.mDecoderInputBuffers[result], 0);
+                long sampleTime = decoderWrapper.mExtractor.getSampleTime();
                 boolean isKeyFrame = (decoderWrapper.mExtractor.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0;
-                decoderWrapper.mDecoder.queueInputBuffer(result, 0, sampleSize, decoderWrapper.mExtractor.getSampleTime(), isKeyFrame ? MediaCodec.BUFFER_FLAG_SYNC_FRAME : 0);
+                decoderWrapper.mDecoder.queueInputBuffer(result, 0, sampleSize, sampleTime, isKeyFrame ? MediaCodec.BUFFER_FLAG_SYNC_FRAME : 0);
                 decoderWrapper.mExtractor.advance();
                 sampleProcessed = true;
+
+                // Seek at least to previous key frame if needed cause it's a lot faster
+                TimeLine.SegmentChannel segmentChannel = segment.getSegmentChannel(channelName);
+                Long seek = segmentChannel.getVideoSeek();
+                if (seek != null && sampleTime < seek) {
+                    decoderWrapper.mExtractor.seekTo(seek, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                    segmentChannel.seekRequestedVideo(); // So we don't repeat
+                    TLog.d(TAG, "Extractor Seek " + seek);
+                }
             }
         }
         return  sampleProcessed ? DRAIN_STATE_CONSUMED : DRAIN_STATE_NONE;
@@ -403,7 +414,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                         decoderWrapper.mOutputSurface.signalEndOfInputStream();
                         decoderWrapper.mIsDecoderEOS = true;
                         segment.forceEndOfStream(mOutputPresentationTimeDecodedUs + 1);
-                        TLog.d(TAG, "End of Stream video " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
+                        TLog.d(TAG, "End of Stream video " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                         mTextures = 1; // Write if there is a texture
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                         throttle.remove("Video" + channelName);
@@ -436,13 +447,13 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             decoderWrapper.filterTick(mOutputPresentationTimeDecodedUs);
                             ++mTexturesReady;
                             consumed = true;
-                            TLog.d(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
+                            TLog.d(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             mOutputPresentationTimeDecodedUs = Math.max(bufferOutputTime, mOutputPresentationTimeDecodedUs);
                             inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
 
                             // Seeking - release it without rendering
                         } else {
-                            TLog.d(TAG, "Skipping video " + (decoderWrapper.mBufferInfo.presentationTimeUs + inputChannel.mInputOffsetUs) + " for decoder " + channelName);
+                            TLog.d(TAG, "Skipping video " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                             inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         }

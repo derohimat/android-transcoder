@@ -223,13 +223,14 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         return stepped;
     }
 
-    private int drainExtractors(TimeLine.Segment outputSegment, long timeoutUs) {
+    private int drainExtractors(TimeLine.Segment segment, long timeoutUs) {
 
         boolean sampleProcessed = false;
 
-        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : outputSegment.getAudioChannels().entrySet()) {
+        for (Map.Entry<String, TimeLine.InputChannel> inputChannelEntry : segment.getAudioChannels().entrySet()) {
 
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
+            String channelName = inputChannelEntry.getKey();
             if (!decoderWrapper.mIsExtractorEOS) {
 
                 // Find out which track the extractor has samples for next
@@ -256,12 +257,22 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     continue;
                 }
                 int sampleSize = decoderWrapper.mExtractor.readSampleData(decoderWrapper.mDecoderInputBuffers.getInputBuffer(result), 0);
+                long sampleTime = decoderWrapper.mExtractor.getSampleTime();
                 boolean isKeyFrame = (decoderWrapper.mExtractor.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0;
                 decoderWrapper.mDecoder.queueInputBuffer(result, 0, sampleSize, decoderWrapper.mExtractor.getSampleTime(), isKeyFrame ? MediaCodec.BUFFER_FLAG_SYNC_FRAME : 0);
 
-
                 decoderWrapper.mExtractor.advance();
                 sampleProcessed = true;
+
+                // Seek at least to previous key frame if needed cause it's a lot faster
+                TimeLine.SegmentChannel segmentChannel = segment.getSegmentChannel(channelName);
+                Long seek = segmentChannel.getAudioSeek();
+                if (seek != null && sampleTime < seek) {
+                    decoderWrapper.mExtractor.seekTo(seek, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+                    segmentChannel.seekRequestedAudio(); // So we don't repeat
+                    TLog.d(TAG, "Extractor Seek " + seek);
+                }
+
             }
         }
         return  sampleProcessed ? DRAIN_STATE_CONSUMED : DRAIN_STATE_NONE;
@@ -313,7 +324,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     mAudioChannel.removeBuffers(channelName);
                     if (mIsLastSegment)
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l);
-                    TLog.d(TAG, "Audio End of Stream audio " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
+                    TLog.d(TAG, "Audio End of Stream audio " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                     throttle.remove("Audio" + channelName);
 
                 // Process a buffer with data

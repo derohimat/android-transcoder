@@ -171,6 +171,22 @@ public class TimeLine {
     public class SegmentChannel {
         public InputChannel mChannel;
         public Filter mFilter;
+        public Long mSeek;
+        boolean mAudioSeekRequested = false;
+        boolean mVideoSeekRequested = false;
+
+        public Long getVideoSeek() {
+            return  mVideoSeekRequested ? null : mSeek;
+        }
+        public Long getAudioSeek() {
+            return  mAudioSeekRequested ? null : mSeek;
+        }
+        public void seekRequestedVideo() {
+            mVideoSeekRequested = true;
+        }
+        public void seekRequestedAudio() {
+            mAudioSeekRequested = true;
+        }
 
         SegmentChannel(InputChannel input, Filter filter) {
             mChannel = input;
@@ -218,7 +234,9 @@ public class TimeLine {
             return firstChannelEntry.getValue().mChannel.mLengthUs -
                     (mSeeks.get(firstChannelEntry.getKey()) == null ? 0l : mSeeks.get(firstChannelEntry.getKey()));
         }
-
+        public SegmentChannel getSegmentChannel(String channel) {
+            return mSegmentChannels.get(channel);
+        }
         public void start (Long segmentStartTimeUs, Segment previousSegment) {
 
             mOutputStartTimeUs = Math.max(segmentStartTimeUs, previousSegment == null ? 0 :
@@ -227,11 +245,13 @@ public class TimeLine {
             for (HashMap.Entry<String, SegmentChannel> segmentChannelEntry : mSegmentChannels.entrySet()) {
                 SegmentChannel segmentChannel = segmentChannelEntry.getValue();
                 String channelName = segmentChannelEntry.getKey();
-                InputChannel inputChannel = segmentChannel.mChannel;
-                inputChannel.mInputStartTimeUs = (mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l) + inputChannel.mInputAcutalEndTimeUs;
+                Long seek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : null;
+                 InputChannel inputChannel = segmentChannel.mChannel;
+                inputChannel.mInputStartTimeUs = (seek != null ?  seek : 0l) + inputChannel.mInputAcutalEndTimeUs;
                 inputChannel.mInputOffsetUs = mOutputStartTimeUs - inputChannel.mInputStartTimeUs;
                 inputChannel.mInputEndTimeUs = mDuration != null ? inputChannel.mInputStartTimeUs + mDuration : null;
                 inputChannel.mInputAcutalEndTimeUs = mOutputStartTimeUs;
+                segmentChannel.mSeek = (seek != null) ? inputChannel.mInputStartTimeUs : null;
             }
         }
 

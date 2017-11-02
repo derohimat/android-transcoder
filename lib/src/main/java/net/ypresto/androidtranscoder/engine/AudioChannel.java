@@ -23,6 +23,16 @@ import java.util.Queue;
  */
 class AudioChannel {
 
+    private class RemixResult  {
+        public long mPresentationTime;
+        public int mBufferPosition;
+        public int mBufferOverflowPosition;
+        RemixResult(long presentationTime, int bufferPosition, int bufferOverflowPosition) {
+            mBufferPosition = bufferPosition;
+            mPresentationTime = presentationTime;
+            mBufferOverflowPosition = bufferOverflowPosition;
+        }
+    }
     private static class AudioBuffer {
         int bufferIndex;
         Long presentationTimeUs;
@@ -252,13 +262,18 @@ class AudioChannel {
         Long startingPresentationTimeUs  = mOutputPresentationTimeUs;
         Long endingPresentationTimeUs = mOutputPresentationTimeUs;
         boolean append = false;
+        int position = 0;
+        int overflowPosition = 0;
         for (Map.Entry<String, Queue<AudioBuffer>> entry : mFilledBuffers.entrySet()) {
             Queue<AudioBuffer> filledBuffers = entry.getValue();
             final AudioBuffer decoderBuffer = filledBuffers.poll();
             if (decoderBuffer.bufferIndex != BUFFER_INDEX_END_OF_STREAM) {
                 streamPresent = true;
-                long bufferPresentationTimeUs = remixAndMaybeFillOverflow(decoderBuffer, mEncoderBuffer, append);
-                startingPresentationTimeUs = Math.max(bufferPresentationTimeUs, startingPresentationTimeUs);
+                RemixResult result = remixAndMaybeFillOverflow(decoderBuffer, mEncoderBuffer,
+                        append, position, overflowPosition);
+                position = result.mBufferPosition;
+                overflowPosition = result.mBufferOverflowPosition;
+                startingPresentationTimeUs = Math.max(result.mPresentationTime, startingPresentationTimeUs);
                 endingPresentationTimeUs = startingPresentationTimeUs + sampleCountToDurationUs(decoderBuffer.data.position());
                 mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
                 mEmptyBuffers.get(entry.getKey()).add(decoderBuffer);
@@ -339,10 +354,12 @@ class AudioChannel {
      * @param outBuff - Encoder buffer
      * @return
      */
-    private long remixAndMaybeFillOverflow(final AudioBuffer input,
-                                           final ShortBuffer outBuff, boolean append) {
+    private RemixResult remixAndMaybeFillOverflow(final AudioBuffer input,
+                                           final ShortBuffer outBuff, boolean append, int position, int overflowPosition) {
         final ShortBuffer inBuff = input.data;
         final ShortBuffer overflowBuff = mOverflowBuffer.data;
+        int outputBufferStartingPosition = 0;
+        int overflowBufferStartingPosition = 0;
 
         // Reset position to 0, and set limit to capacity (Since MediaCodec doesn't do that for us)
         inBuff.clear();
@@ -354,7 +371,7 @@ class AudioChannel {
             // Overflow
             // Limit inBuff to outBuff's capacity
             inBuff.limit(outBuff.capacity());
-            mRemixer.remix(inBuff, outBuff, append);
+            outputBufferStartingPosition = mRemixer.remix(inBuff, outBuff, append, position);
 
             // Reset limit to its own capacity & Keep position
             inBuff.limit(inBuff.capacity());
@@ -364,18 +381,19 @@ class AudioChannel {
             // NOTE: We should only reach this point when overflow buffer is empty
             final long consumedDurationUs =
                     sampleCountToDurationUs(inBuff.position());
-            mRemixer.remix(inBuff, overflowBuff, append);
+            overflowBufferStartingPosition = mRemixer.remix(inBuff, overflowBuff, append, overflowPosition);
 
             // Seal off overflowBuff & mark limit
-            overflowBuff.flip();
+            //overflowBuff.flip();
             mOverflowBuffer.presentationTimeUs = input.presentationTimeUs + consumedDurationUs +
             input.presentationTimeOffsetUs;
         } else {
             // No overflow
-            mRemixer.remix(inBuff, outBuff, append);
+            outputBufferStartingPosition = mRemixer.remix(inBuff, outBuff, append, position);
             //outBuff.flip();
         }
 
-        return Math.max(0, input.presentationTimeUs + input.presentationTimeOffsetUs) ;
+        return new RemixResult(Math.max(0, input.presentationTimeUs + input.presentationTimeOffsetUs),
+                outputBufferStartingPosition, overflowBufferStartingPosition);
     }
 }

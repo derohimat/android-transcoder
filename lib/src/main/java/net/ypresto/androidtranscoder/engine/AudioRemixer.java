@@ -4,7 +4,7 @@ import java.nio.ShortBuffer;
 
 public class AudioRemixer {
 
-    void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append) {};
+    int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position) {return 0;};
 
     static final int SIGNED_SHORT_LIMIT = 32768;
     static final int UNSIGNED_SHORT_MAX = 65535;
@@ -34,14 +34,17 @@ public class AudioRemixer {
     static AudioRemixer DOWNMIX = new AudioRemixer() {
 
         @Override
-        public void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append) {
+        public int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position) {
             // Down-mix stereo to mono
             final int inRemaining = inSBuff.remaining() / 2;
             final int outSpace = outSBuff.remaining();
             final int samplesToBeProcessed = Math.min(inRemaining, outSpace);
+            int outBuffStartingPosition = 0;
 
             if (append) {
-                ShortBuffer outSBuffCopy = outSBuff.asReadOnlyBuffer();
+                ShortBuffer outSBuffCopy = outSBuff.duplicate();
+                outBuffStartingPosition = outSBuffCopy.position();
+                outSBuffCopy.position(position);
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned
                     final int aLeft = inSBuff.get();
@@ -55,22 +58,26 @@ public class AudioRemixer {
                     // Convert to unsigned
                     final int a = inSBuff.get();
                     final int b = inSBuff.get();
+                    outBuffStartingPosition = outSBuff.position();
                     outSBuff.put(mix(a, b));
                 }
             }
+            return outBuffStartingPosition;
         }
     };
 
     static AudioRemixer UPMIX = new AudioRemixer() {
         @Override
-        public void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append) {
+        public int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position) {
             // Up-mix mono to stereo
             final int inRemaining = inSBuff.remaining();
             final int outSpace = outSBuff.remaining() / 2;
-
+            int outBuffStartingPosition = 0;
             final int samplesToBeProcessed = Math.min(inRemaining, outSpace);
             if (append) {
-                ShortBuffer outSBuffCopy = outSBuff.asReadOnlyBuffer();
+                ShortBuffer outSBuffCopy = outSBuff.duplicate();
+                outBuffStartingPosition = outSBuffCopy.position();
+                outSBuffCopy.position(position);
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned
                     final int a = inSBuff.get();
@@ -82,22 +89,27 @@ public class AudioRemixer {
             } else {
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     final short inSample = inSBuff.get();
+                    outBuffStartingPosition = outSBuff.position();
                     outSBuff.put(inSample);
                     outSBuff.put(inSample);
                 }
             }
+            return outBuffStartingPosition;
         }
     };
 
     static AudioRemixer PASSTHROUGH = new AudioRemixer() {
         @Override
-        public void remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append) {
+        public int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position) {
 
+            int outBuffStartingPosition = 0;
             if (append) {
-                ShortBuffer outSBuffCopy = outSBuff.asReadOnlyBuffer();
+                ShortBuffer outSBuffCopy = outSBuff.duplicate();
                 final int inRemaining = inSBuff.remaining();
                 final int outSpace = outSBuff.remaining() / 2;
                 final int samplesToBeProcessed = Math.min(inRemaining, outSpace);
+                outBuffStartingPosition = outSBuff.position();
+                outSBuffCopy.position(position);
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned
                     final int aLeft = inSBuff.get();
@@ -111,8 +123,10 @@ public class AudioRemixer {
             } else {
 
                 // Passthrough
+                outBuffStartingPosition = outSBuff.position();
                 outSBuff.put(inSBuff);
             }
+            return outBuffStartingPosition;
         }
     };
 

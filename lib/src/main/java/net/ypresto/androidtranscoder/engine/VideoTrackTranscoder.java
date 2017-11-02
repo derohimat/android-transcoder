@@ -469,7 +469,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         }
 
         // If all textures have been accumulated draw the image and send it to the encoder
-        if (mTexturesReady >= mTextures) {
+        if (mTexturesReady >= mTextures && mTextures > 0) {
 
             for (TextureRender textureRender : mTextureRender) {
                 textureRender.drawFrame();

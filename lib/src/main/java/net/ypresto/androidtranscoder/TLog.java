@@ -11,7 +11,7 @@ public final class TLog {
         TLog.targetLevel = level;
     }
     private static Pattern targetTags = null;
-    private static int targetLevel = 2;
+    private static int targetLevel = 4;
     private static boolean doLog(String tag, int level) {
         if (level < TLog.targetLevel)
             return false;

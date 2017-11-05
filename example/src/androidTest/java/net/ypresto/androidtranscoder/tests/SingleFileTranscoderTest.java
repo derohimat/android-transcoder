@@ -18,9 +18,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
 
@@ -31,6 +33,7 @@ public class SingleFileTranscoderTest {
     private static final String TAG = "JUnitTranscoder";
     private String inputFileName1;
     private String inputFileName2;
+    private String inputFileName3;
     private volatile String status = "not started";
 
     MediaTranscoder.Listener listener = new MediaTranscoder.Listener() {
@@ -58,6 +61,7 @@ public class SingleFileTranscoderTest {
     public void retrieveVideo ()  {
         inputFileName1 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input1.mp4";
         inputFileName2 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input2.mp4";
+        inputFileName3 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFileMono.mp4";
         cleanup(inputFileName1);
         cleanup(inputFileName2);
         try {
@@ -76,6 +80,11 @@ public class SingleFileTranscoderTest {
             in.close();
             out.close();
         } catch(IOException e) {
+            assertEquals("Exception on file copy", "none", e + Log.getStackTraceString(e));
+        }
+        try {
+            SingleFileToMono();
+        } catch(Exception e) {
             assertEquals("Exception on file copy", "none", e + Log.getStackTraceString(e));
         }
     }
@@ -101,6 +110,23 @@ public class SingleFileTranscoderTest {
             }
         });
     }
+
+    public void SingleFileToMono() throws InterruptedException, ExecutionException, FileNotFoundException {
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFileMono.mp4";
+                cleanup(outputFileName);
+                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+                TimeLine timeline = new TimeLine()
+                        .addChannel("A", in1.getFileDescriptor())
+                        .createSegment()
+                        .output("A")
+                        .timeLine();
+                (MediaTranscoder.getInstance().transcodeVideo(
+                        timeline, outputFileName,
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, 1),
+                        listener)
+                ).get();
+    }
+
     @Test()
     public void QuadFile() {
         runTest(new Transcode() {
@@ -138,6 +164,7 @@ public class SingleFileTranscoderTest {
             }
         });
     }
+
     @Test()
     public void CrossfadeStitch() {
         runTest(new Transcode() {
@@ -173,12 +200,103 @@ public class SingleFileTranscoderTest {
                     .timeLine();
                 (MediaTranscoder.getInstance().transcodeVideo(
                         timeline, outputFileName,
-                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(
+                                Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS,
+                                Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
                         listener)
                 ).get();
             }
         });
     }
+
+    @Test()
+    public void CrossfadeStitchDownMix() {
+        runTest(new Transcode() {
+            @Override
+            public void run() throws IOException, InterruptedException, ExecutionException {
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_CrossfadeStitch2.mp4";
+                cleanup(outputFileName);
+                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+                ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File(inputFileName2), ParcelFileDescriptor.MODE_READ_ONLY);
+                TimeLine timeline = new TimeLine()
+                        .addChannel("A", in1.getFileDescriptor())
+                        .addChannel("B", in1.getFileDescriptor())
+                        .addChannel("C", in1.getFileDescriptor())
+                        .addAudioOnlyChannel("D", in2.getFileDescriptor())
+                        .createSegment()
+                        .output("C")
+                        .output("D")
+                        .duration(1000)
+                        .timeLine().createSegment()
+                        .output("C", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                        .output("A", TimeLine.Filter.OPACITY_UP_RAMP)
+                        .output("D")
+                        .duration(2000)
+                        .timeLine().createSegment()
+                        .duration(1500)
+                        .output("A")
+                        .output("D")
+                        .timeLine().createSegment()
+                        .seek("B", 1000)
+                        .output("B")
+                        .duration(1500)
+                        .output("D")
+                        .timeLine();
+                (MediaTranscoder.getInstance().transcodeVideo(
+                        timeline, outputFileName,
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(
+                                Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS,
+                                1),
+                        listener)
+                ).get();
+            }
+        });
+    }
+
+    @Test()
+    public void CrossfadeStitchUpMix() {
+        runTest(new Transcode() {
+            @Override
+            public void run() throws IOException, InterruptedException, ExecutionException {
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_CrossfadeStitch3.mp4";
+                cleanup(outputFileName);
+                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+                ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File(inputFileName3), ParcelFileDescriptor.MODE_READ_ONLY);
+                TimeLine timeline = new TimeLine()
+                        .addChannel("A", in1.getFileDescriptor())
+                        .addChannel("B", in1.getFileDescriptor())
+                        .addChannel("C", in1.getFileDescriptor())
+                        .addAudioOnlyChannel("D", in2.getFileDescriptor())
+                        .createSegment()
+                        .output("C")
+                        .output("D")
+                        .duration(1000)
+                        .timeLine().createSegment()
+                        .output("C", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                        .output("A", TimeLine.Filter.OPACITY_UP_RAMP)
+                        .output("D")
+                        .duration(2000)
+                        .timeLine().createSegment()
+                        .duration(1500)
+                        .output("A")
+                        .output("D")
+                        .timeLine().createSegment()
+                        .seek("B", 1000)
+                        .output("B")
+                        .duration(1500)
+                        .output("D")
+                        .timeLine();
+                (MediaTranscoder.getInstance().transcodeVideo(
+                        timeline, outputFileName,
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(
+                                Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS,
+                                Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
+                        listener)
+                ).get();
+            }
+        });
+    }
+
     @Test()
     public void HopScotch() {
         runTest(new Transcode() {
@@ -218,6 +336,7 @@ public class SingleFileTranscoderTest {
             }
         });
     }
+
     @Test()
     public void HopScotch2() {
         runTest(new Transcode() {
@@ -249,6 +368,7 @@ public class SingleFileTranscoderTest {
             }
         });
     }
+
     @Test()
     public void HopScotch3() {
         runTest(new Transcode() {
@@ -257,7 +377,7 @@ public class SingleFileTranscoderTest {
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch3.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine()
+                TimeLine timeline = new TimeLine(2)
                         .addChannel("A0", in1.getFileDescriptor())
                         .addChannel("A1", in1.getFileDescriptor())
                         .addChannel("A2", in1.getFileDescriptor())
@@ -287,42 +407,34 @@ public class SingleFileTranscoderTest {
             }
         });
     }
-/*
-@Test()
+
+//@Test()
 public void ThreeFiles() {
     runTest(new Transcode() {
         @Override
         public void run() throws IOException, InterruptedException, ExecutionException {
-            String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_threefiles.mp4";
+            String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/fish13.mp4";
             cleanup(outputFileName);
-            ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171005_113258.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
-            ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171005_112555.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
-            ParcelFileDescriptor in3 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171005_113905.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
-            TimeLine timeline = new TimeLine()
+            ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171031_173205.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
+            ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171031_173205.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
+            TimeLine timeline = new TimeLine(2)
                     .addChannel("A1", in1.getFileDescriptor())
                     .addChannel("A2", in2.getFileDescriptor())
-                    .addChannel("A3", in3.getFileDescriptor())
                     .createSegment()
                         .output("A1")
-                        .duration(11964)
+                        .duration(5858 - 750)
+                        .seek("A1", 22524)
                         .timeLine()
                     .createSegment()
                         .output("A1", TimeLine.Filter.OPACITY_DOWN_RAMP)
                         .output("A2", TimeLine.Filter.OPACITY_UP_RAMP)
+                        .seek("A2", 22524 + 5858 + 8251)
                         .duration(750)
                         .timeLine()
                     .createSegment()
-                        .output("A2")
-                        .duration(11815)
-                        .timeLine()
-                    .createSegment()
-                        .output("A2", TimeLine.Filter.OPACITY_DOWN_RAMP)
-                        .output("A3", TimeLine.Filter.OPACITY_UP_RAMP)
-                        .duration(750)
-                        .timeLine()
-                    .createSegment()
-                        .output("A3")
-                        .duration(6994)
+                        .output("A1")
+                        .seek("A1", 8251 + 750)
+                        .duration(5000)
                         .timeLine();
               (MediaTranscoder.getInstance().transcodeVideo(
                     timeline, outputFileName,
@@ -332,7 +444,7 @@ public void ThreeFiles() {
         }
     });
 }
-*/
+
     public interface Transcode {
         void run () throws IOException, InterruptedException, ExecutionException;
     }

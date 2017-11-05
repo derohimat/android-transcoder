@@ -49,9 +49,8 @@ public class AudioRemixer {
                     // Convert to unsigned
                     final int aLeft = inSBuff.get();
                     final int aRight = inSBuff.get();
-                    final int bLeft = outSBuffCopy.get();
-                    final int bRight = outSBuffCopy.get();
-                    outSBuff.put(mix(mix(aLeft, bLeft), mix(aRight, bRight)));
+                    final int ab = outSBuffCopy.get();
+                    outSBuff.put(mix(mix(aLeft, aRight), ab));
                 }
             } else {
                 for (int i = 0; i < samplesToBeProcessed; ++i) {

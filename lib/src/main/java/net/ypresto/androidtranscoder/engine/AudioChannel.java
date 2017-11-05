@@ -384,7 +384,7 @@ class AudioChannel {
             overflowBufferStartingPosition = mRemixer.remix(inBuff, overflowBuff, append, overflowPosition);
 
             // Seal off overflowBuff & mark limit
-            //overflowBuff.flip();
+            overflowBuff.flip();
             mOverflowBuffer.presentationTimeUs = input.presentationTimeUs + consumedDurationUs +
             input.presentationTimeOffsetUs;
         } else {

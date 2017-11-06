@@ -251,7 +251,7 @@ class AudioChannel {
             mEncoder.queueInputBuffer(mEncoderBufferIndex,
                     0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                     presentationTimeUs, 0);
-            TLog.d(TAG, "Submitting audio overflow buffer at " + presentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
+            TLog.v(TAG, "Submitting audio overflow buffer at " + presentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
             presentationTimeUs += sampleCountToDurationUs(mEncoderBuffer.position());
             mEncoderBuffer = null;
             return presentationTimeUs;
@@ -283,7 +283,7 @@ class AudioChannel {
         if (!streamPresent) {
             //mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
             mEncoderBuffer = null;
-            TLog.d(TAG, "No stream present - signaling end of stream to encoder");
+            TLog.d(TAG, "No stream present");
             return null;
         } else {
             if (mEncoderBuffer.limit() > 0) {
@@ -294,7 +294,7 @@ class AudioChannel {
                 mEncoder.queueInputBuffer(mEncoderBufferIndex,
                         0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                         startingPresentationTimeUs, 0);
-                TLog.d(TAG, "Submitting audio buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
+                TLog.v(TAG, "Submitting audio buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
                 mOutputPresentationTimeUs = endingPresentationTimeUs;
                 mEncoderBuffer = null;
             } else {
@@ -365,7 +365,7 @@ class AudioChannel {
         inBuff.clear();
         outBuff.clear();
 
-        TLog.d(TAG, "remixing buffer at " + (input.presentationTimeUs + input.presentationTimeOffsetUs) + " length " +  sampleCountToDurationUs(inBuff.remaining()));
+        TLog.v(TAG, "remixing buffer at " + (input.presentationTimeUs + input.presentationTimeOffsetUs) + " length " +  sampleCountToDurationUs(inBuff.remaining()));
 
         if (inBuff.remaining() > outBuff.remaining()) {
             // Overflow

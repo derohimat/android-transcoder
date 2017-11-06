@@ -39,7 +39,7 @@ public class SingleFileTranscoderTest {
     MediaTranscoder.Listener listener = new MediaTranscoder.Listener() {
         @Override
         public void onTranscodeProgress(double progress) {
-            Log.d(TAG, "Progress " + progress);
+            //Log.d(TAG, "Progress " + progress);
         }
         @Override
         public void onTranscodeCompleted() {

@@ -447,13 +447,13 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             decoderWrapper.filterTick(mOutputPresentationTimeDecodedUs);
                             ++mTexturesReady;
                             consumed = true;
-                            TLog.d(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
+                            TLog.v(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             mOutputPresentationTimeDecodedUs = Math.max(bufferOutputTime, mOutputPresentationTimeDecodedUs);
                             inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
 
                             // Seeking - release it without rendering
                         } else {
-                            TLog.d(TAG, "Skipping video " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
+                            TLog.v(TAG, "Skipping video " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                             inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         }
@@ -474,7 +474,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             for (TextureRender textureRender : mTextureRender) {
                 textureRender.drawFrame();
             }
-            TLog.d(TAG, "Encoded video " + mOutputPresentationTimeDecodedUs + " for decoder ");
+            TLog.v(TAG, "Encoded video " + mOutputPresentationTimeDecodedUs + " for decoder ");
             mEncoderInputSurfaceWrapper.setPresentationTime(mOutputPresentationTimeDecodedUs * 1000);
             mEncoderInputSurfaceWrapper.swapBuffers();
             mOutputPresentationTimeDecodedUs += 1; // Hack to ensure next one greater than current;

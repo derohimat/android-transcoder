@@ -209,7 +209,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
         while ((presentationTimeUs = mAudioChannel.feedEncoder(0)) != null) {
             if (presentationTimeUs >= 0) {
-                TLog.d(TAG, "Encoded audio from " + mOutputPresentationTimeDecodedUs + " to " + presentationTimeUs);
+                TLog.v(TAG, "Encoded audio from " + mOutputPresentationTimeDecodedUs + " to " + presentationTimeUs);
                 mOutputPresentationTimeDecodedUs = Math.max(mOutputPresentationTimeDecodedUs, presentationTimeUs);
             } else {
                 for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
@@ -334,7 +334,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     if (bufferInputStartTime < inputChannel.mInputStartTimeUs) {
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
-                        TLog.d(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
+                        TLog.v(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
 
                     // Requeue buffer if to far ahead of other tracks
                     } else if (!throttle.canProceed("Audio" + channelName, bufferOutputTime)) {
@@ -345,7 +345,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
                         // Submit buffer for audio mixing
                     } else {
-                        TLog.d(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
+                        TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,
                                 inputChannel.mInputOffsetUs, inputChannel.mInputStartTimeUs, inputChannel.mInputEndTimeUs);

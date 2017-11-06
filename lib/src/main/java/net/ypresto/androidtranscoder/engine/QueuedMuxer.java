@@ -30,7 +30,7 @@ import java.util.List;
  */
 public class QueuedMuxer {
     private static final String TAG = "QueuedMuxer";
-    private static final int BUFFER_SIZE = 128 * 1024; // I have no idea whether this value is appropriate or not...
+    private static final int BUFFER_SIZE = 256 * 1024; // I have no idea whether this value is appropriate or not...
     private final MediaMuxer mMuxer;
     private final Listener mListener;
     private MediaFormat mVideoFormat;

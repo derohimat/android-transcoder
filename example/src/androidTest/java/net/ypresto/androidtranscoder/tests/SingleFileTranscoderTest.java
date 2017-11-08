@@ -39,7 +39,7 @@ public class SingleFileTranscoderTest {
     MediaTranscoder.Listener listener = new MediaTranscoder.Listener() {
         @Override
         public void onTranscodeProgress(double progress) {
-            //Log.d(TAG, "Progress " + progress);
+            Log.d(TAG, "Progress " + progress);
         }
         @Override
         public void onTranscodeCompleted() {
@@ -377,7 +377,7 @@ public class SingleFileTranscoderTest {
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch3.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine(2)
+                TimeLine timeline = new TimeLine()
                         .addChannel("A0", in1.getFileDescriptor())
                         .addChannel("A1", in1.getFileDescriptor())
                         .addChannel("A2", in1.getFileDescriptor())
@@ -417,7 +417,7 @@ public void ThreeFiles() {
             cleanup(outputFileName);
             ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171031_173205.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
             ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171031_173205.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
-            TimeLine timeline = new TimeLine(2)
+            TimeLine timeline = new TimeLine()
                     .addChannel("A1", in1.getFileDescriptor())
                     .addChannel("A2", in2.getFileDescriptor())
                     .createSegment()

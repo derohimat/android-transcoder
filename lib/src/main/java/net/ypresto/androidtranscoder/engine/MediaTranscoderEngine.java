@@ -319,6 +319,7 @@ public class MediaTranscoderEngine {
         long loopCount = 0;
         long outputPresentationTimeDecodedUs = 0l;
         long outputSyncTimeUs = 0l;
+        double lastProgress = -1;
         if (mDurationUs <= 0) {
             double progress = PROGRESS_UNKNOWN;
             mProgress = progress;
@@ -343,7 +344,9 @@ public class MediaTranscoderEngine {
                 if (mDurationUs > 0 && loopCount % PROGRESS_INTERVAL_STEPS == 0) {
                     double progress = Math.min(1.0, (double) mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs() / mDurationUs);
                     mProgress = progress;
-                    if (mProgressCallback != null) mProgressCallback.onProgress(progress);
+                    double roundedProgress = Math.round(progress * 100);
+                    if (mProgressCallback != null && roundedProgress != lastProgress) mProgressCallback.onProgress(progress);
+                    lastProgress = roundedProgress;
                 }
 
                 if (!stepped) {

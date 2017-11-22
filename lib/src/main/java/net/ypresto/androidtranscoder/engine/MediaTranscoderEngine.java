@@ -68,9 +68,6 @@ public class MediaTranscoderEngine {
         public void participate (String channel) {
             mLowestPresentationTime.put(channel, null);
         }
-        public void remove (String channel) {
-            mLowestPresentationTime.remove(channel);
-        }
         public void startSegment() {
             mLowestPresentationTime = new LinkedHashMap<String, Long>();
         }
@@ -112,6 +109,7 @@ public class MediaTranscoderEngine {
                 mShouldCancel = false;
                 mBlockedStartTime = null;
             }
+            mBufferProcessed = false;
         }
         public boolean shouldCancel() {
             return mShouldCancel;

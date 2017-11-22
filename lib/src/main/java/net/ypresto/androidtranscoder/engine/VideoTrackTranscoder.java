@@ -49,7 +49,6 @@ public class VideoTrackTranscoder implements TrackTranscoder {
         private ByteBuffer [] mDecoderInputBuffers;
         private OutputSurface mOutputSurface;
         private Integer mTrackIndex;
-        private Long mPresentationTimeRequeued = null;
         boolean mBufferRequeued;
         int mResult;
         private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
@@ -386,12 +385,10 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(channelName);
 
             // Only process if we have not end end of stream for this decoder or extractor
-            if (!decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS) {
+            if (throttle.canProceed("Video" + channelName, mOutputPresentationTimeDecodedUs) &&
+                !decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS) {
 
-                if (!decoderWrapper.mOutputSurface.isTextureReady() &&
-                    !decoderWrapper.mOutputSurface.isEndOfInputStream()  &&
-                    (decoderWrapper.mPresentationTimeRequeued == null || throttle.canProceed("Video" + channelName, decoderWrapper.mPresentationTimeRequeued))) {
-                    decoderWrapper.mPresentationTimeRequeued =  null;
+                if (!decoderWrapper.mOutputSurface.isTextureReady() && !decoderWrapper.mOutputSurface.isEndOfInputStream()) {
 
                     int result = decoderWrapper.dequeueOutputBuffer(timeoutUs);
                     switch (result) {
@@ -417,8 +414,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                         TLog.d(TAG, "End of Stream video " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                         mTextures = 1; // Write if there is a texture
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
-                        throttle.remove("Video" + channelName);
-                    } else {
+                     } else {
 
                         boolean doRender = (decoderWrapper.mBufferInfo.size > 0);
                         // NOTE: doRender will block if buffer (of encoder) is full.
@@ -430,17 +426,8 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             decoderWrapper.mIsSegmentEOS = true;
                             TLog.d(TAG, "End of Segment video " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs + " for video decoder " + channelName);
                             mTextures = 1; // Write if there is a texture
-                            throttle.remove("Video" + channelName);
 
-                            // Requeue buffer if to far ahead of other tracks
-                        } else if (doRender && !throttle.canProceed("Video" + channelName, bufferOutputTime)) {
-                            decoderWrapper.requeueOutputBuffer();
-                            TLog.d(TAG, "RequeueOutputBuffer " + bufferOutputTime + " for video decoder " + channelName);
-                            decoderWrapper.mPresentationTimeRequeued =  bufferOutputTime;
-                            consumed = false;
-
-                            // Within range get image into texture for rendering
-                        } else if (doRender && decoderWrapper.mBufferInfo.presentationTimeUs >= inputChannel.mInputStartTimeUs) {
+                         } else if (doRender && decoderWrapper.mBufferInfo.presentationTimeUs >= inputChannel.mInputStartTimeUs) {
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, true);
                             decoderWrapper.mOutputSurface.awaitNewImage();
                             decoderWrapper.mOutputSurface.setTextureReady();

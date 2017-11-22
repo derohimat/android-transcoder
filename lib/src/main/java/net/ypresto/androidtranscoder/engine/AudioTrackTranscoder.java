@@ -71,7 +71,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         private MediaCodec mDecoder;
         private Integer mTrackIndex;
         boolean mBufferRequeued;
-        private Long mPresentationTimeRequeued = null;
         int mResult;
         private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
         DecoderWrapper(MediaExtractor mediaExtractor) {
@@ -290,15 +289,13 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
 
             // Only process if we have not end end of stream for this decoder or extractor
-            if (!decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS &&
-                (decoderWrapper.mPresentationTimeRequeued == null || throttle.canProceed("Audio" + channelName, decoderWrapper.mPresentationTimeRequeued))) {
-                decoderWrapper.mPresentationTimeRequeued =  null;
+            if (throttle.canProceed("Audio" + channelName, mOutputPresentationTimeDecodedUs) &&
+                !decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS) {
 
                 if (inputChannel.mInputEndTimeUs != null &&
                         mOutputPresentationTimeDecodedUs - inputChannel.mInputOffsetUs > inputChannel.mInputEndTimeUs) {
                     decoderWrapper.mIsSegmentEOS = true;
                     TLog.d(TAG, "End of segment audio " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
-                    throttle.remove("Audio" + channelName);
                     continue;
                 }
 
@@ -325,7 +322,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l);
                     mAudioChannel.removeBuffers(channelName);
                     TLog.d(TAG, "Audio End of Stream audio " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
-                    throttle.remove("Audio" + channelName);
 
                 // Process a buffer with data
                 } else if (decoderWrapper.mBufferInfo.size > 0) {
@@ -336,15 +332,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                         TLog.v(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
 
-                    // Requeue buffer if to far ahead of other tracks
-                    } else if (!throttle.canProceed("Audio" + channelName, bufferOutputTime)) {
-                        decoderWrapper.requeueOutputBuffer();
-                        TLog.d(TAG, "Requeue Audio Buffer " + bufferOutputTime + " for decoder " + channelName);
-                        consumed = false;
-                        decoderWrapper.mPresentationTimeRequeued =  bufferOutputTime;
-
-                        // Submit buffer for audio mixing
-                    } else {
+                     } else {
                         TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,

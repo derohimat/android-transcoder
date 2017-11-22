@@ -98,7 +98,10 @@ public class MediaTranscoderEngine {
             }
             if (allChannelsReporting) {
                 mPresentationThreshold = newPresentationThreshold + ThrottleLimit;
-                mLowestPresentationTime = new LinkedHashMap<String, Long>();
+                for (Map.Entry<String, Long> entry : mLowestPresentationTime.entrySet()) {
+                    entry.setValue(null);
+                }
+
             }
             if (!mBufferProcessed) {
                 if (mBlockedStartTime == null)

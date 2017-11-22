@@ -35,11 +35,12 @@ public class SingleFileTranscoderTest {
     private String inputFileName2;
     private String inputFileName3;
     private volatile String status = "not started";
+    private int LogLevelForTests = 2;//4;
 
     MediaTranscoder.Listener listener = new MediaTranscoder.Listener() {
         @Override
         public void onTranscodeProgress(double progress) {
-            Log.d(TAG, "Progress " + progress);
+            //Log.d(TAG, "Progress " + progress);
         }
         @Override
         public void onTranscodeCompleted() {
@@ -97,7 +98,7 @@ public class SingleFileTranscoderTest {
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFile.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine()
+                TimeLine timeline = new TimeLine(LogLevelForTests)
                         .addChannel("A", in1.getFileDescriptor())
                         .createSegment()
                             .output("A")
@@ -115,7 +116,7 @@ public class SingleFileTranscoderTest {
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFileMono.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine()
+                TimeLine timeline = new TimeLine(LogLevelForTests)
                         .addChannel("A", in1.getFileDescriptor())
                         .createSegment()
                         .output("A")
@@ -135,7 +136,7 @@ public class SingleFileTranscoderTest {
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_QuadFile.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine()
+                TimeLine timeline = new TimeLine(LogLevelForTests)
                     .addChannel("A", in1.getFileDescriptor())
                     .addChannel("B", in1.getFileDescriptor())
                     .addChannel("C", in1.getFileDescriptor())
@@ -174,7 +175,7 @@ public class SingleFileTranscoderTest {
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
                 ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File(inputFileName2), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine()
+                TimeLine timeline = new TimeLine(LogLevelForTests)
                         .addChannel("A", in1.getFileDescriptor())
                         .addChannel("B", in1.getFileDescriptor())
                         .addChannel("C", in1.getFileDescriptor())
@@ -218,7 +219,7 @@ public class SingleFileTranscoderTest {
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
                 ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File(inputFileName2), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine()
+                TimeLine timeline = new TimeLine(LogLevelForTests)
                         .addChannel("A", in1.getFileDescriptor())
                         .addChannel("B", in1.getFileDescriptor())
                         .addChannel("C", in1.getFileDescriptor())
@@ -262,7 +263,7 @@ public class SingleFileTranscoderTest {
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
                 ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File(inputFileName3), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine()
+                TimeLine timeline = new TimeLine(LogLevelForTests)
                         .addChannel("A", in1.getFileDescriptor())
                         .addChannel("B", in1.getFileDescriptor())
                         .addChannel("C", in1.getFileDescriptor())
@@ -305,7 +306,7 @@ public class SingleFileTranscoderTest {
             String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch.mp4";
             cleanup(outputFileName);
             ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
-            TimeLine timeline = new TimeLine()
+            TimeLine timeline = new TimeLine(LogLevelForTests)
                 .addChannel("A", in1.getFileDescriptor())
                 .addChannel("B", in1.getFileDescriptor())
                 .createSegment()
@@ -345,7 +346,7 @@ public class SingleFileTranscoderTest {
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch2.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine()
+                TimeLine timeline = new TimeLine(LogLevelForTests)
                         .addChannel("A", in1.getFileDescriptor())
                         .addChannel("B", in1.getFileDescriptor())
                         .createSegment()
@@ -377,7 +378,7 @@ public class SingleFileTranscoderTest {
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch3.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine()
+                TimeLine timeline = new TimeLine(LogLevelForTests)
                         .addChannel("A0", in1.getFileDescriptor())
                         .addChannel("A1", in1.getFileDescriptor())
                         .addChannel("A2", in1.getFileDescriptor())
@@ -417,7 +418,7 @@ public void ThreeFiles() {
             cleanup(outputFileName);
             ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171031_173205.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
             ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171031_173205.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);
-            TimeLine timeline = new TimeLine()
+            TimeLine timeline = new TimeLine(LogLevelForTests)
                     .addChannel("A1", in1.getFileDescriptor())
                     .addChannel("A2", in2.getFileDescriptor())
                     .createSegment()

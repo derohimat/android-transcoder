@@ -321,9 +321,9 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     decoderWrapper.mIsDecoderEOS = true;
                     segment.forceEndOfStream(mOutputPresentationTimeDecodedUs);
                     decoderWrapper.requeueOutputBuffer();
-                    mAudioChannel.removeBuffers(channelName);
                     if (mIsLastSegment)
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l);
+                    mAudioChannel.removeBuffers(channelName);
                     TLog.d(TAG, "Audio End of Stream audio " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                     throttle.remove("Audio" + channelName);
 

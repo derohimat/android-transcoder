@@ -199,7 +199,7 @@ class AudioChannel {
         buffer.data = data == null ? null : data.asShortBuffer();
 
         // Make sure we have an overflow buffer ready
-        if (mOverflowBuffer.data == null) {
+        if (mOverflowBuffer.data == null && data != null) {
             mOverflowBuffer.data = ByteBuffer
                     .allocateDirect(data.capacity())
                     .order(ByteOrder.nativeOrder())
@@ -234,12 +234,10 @@ class AudioChannel {
             return null;
         }
 
-        // Get a buffer from the encoder that we can fill
+        // Get a buffer from the encoder that we can fill or wait until there is a buffer
         if (mEncoderBuffer == null) {
            mEncoderBufferIndex = mEncoder.dequeueInputBuffer(timeoutUs);
             if (mEncoderBufferIndex < 0) {
-                TLog.d(TAG, "Encoder full");
-                // Encoder is full - Bail out
                 return null;
             }
             mEncoderBuffer = mEncoderBuffers.getInputBuffer(mEncoderBufferIndex).asShortBuffer();
@@ -281,9 +279,9 @@ class AudioChannel {
             }
         }
         if (!streamPresent) {
-            //mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+            mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
             mEncoderBuffer = null;
-            TLog.d(TAG, "No stream present");
+            TLog.d(TAG, "Signaled Audio End of Stream to encoder");
             return null;
         } else {
             if (mEncoderBuffer.limit() > 0) {

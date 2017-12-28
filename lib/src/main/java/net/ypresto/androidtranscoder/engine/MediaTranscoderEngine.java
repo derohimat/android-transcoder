@@ -72,9 +72,9 @@ public class MediaTranscoderEngine {
             mLowestPresentationTime = new LinkedHashMap<String, Long>();
         }
 
-        public boolean canProceed(String channel, long presentationTime) {
+        public boolean canProceed(String channel, long presentationTime, boolean endOfStream) {
 
-            mLowestPresentationTime.put(channel, presentationTime);
+            mLowestPresentationTime.put(channel, endOfStream ? -1 : presentationTime);
 
             // If not too far ahead of target allow processing
             if (presentationTime <= mPresentationThreshold) {
@@ -88,8 +88,11 @@ public class MediaTranscoderEngine {
             long newPresentationThreshold = ThrottleSeed;
             boolean allChannelsReporting = true;
             for (Map.Entry<String, Long> entry : mLowestPresentationTime.entrySet()) {
+
                 if (entry.getValue() == null)
                     allChannelsReporting = false;
+                else if (entry.getValue() < 1)
+                    continue;
                 else if (entry.getValue() < newPresentationThreshold)
                     newPresentationThreshold = entry.getValue();
             }

@@ -385,7 +385,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(channelName);
 
             // Only process if we have not end end of stream for this decoder or extractor
-            if (throttle.canProceed("Video" + channelName, mOutputPresentationTimeDecodedUs) &&
+            if (throttle.canProceed("Video" + channelName, mOutputPresentationTimeDecodedUs, decoderWrapper.mIsDecoderEOS) &&
                 !decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS) {
 
                 if (!decoderWrapper.mOutputSurface.isTextureReady() && !decoderWrapper.mOutputSurface.isEndOfInputStream()) {

@@ -289,7 +289,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             DecoderWrapper decoderWrapper = mDecoderWrappers.get(inputChannelEntry.getKey());
 
             // Only process if we have not end end of stream for this decoder or extractor
-            if (throttle.canProceed("Audio" + channelName, mOutputPresentationTimeDecodedUs) &&
+            if (throttle.canProceed("Audio" + channelName, mOutputPresentationTimeDecodedUs, decoderWrapper.mIsDecoderEOS) &&
                 !decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS) {
 
                 if (inputChannel.mInputEndTimeUs != null &&

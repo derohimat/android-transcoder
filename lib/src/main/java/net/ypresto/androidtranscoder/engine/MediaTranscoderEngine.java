@@ -339,8 +339,9 @@ public class MediaTranscoderEngine {
             mVideoTrackTranscoder.setupDecoders(outputSegment, mThrottle);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
 
-               boolean stepped = mVideoTrackTranscoder.stepPipeline(outputSegment, mThrottle) ||
-                                  mAudioTrackTranscoder.stepPipeline(outputSegment, mThrottle);
+                boolean videoStepped = mVideoTrackTranscoder.stepPipeline(outputSegment, mThrottle);
+                boolean audioStepped = mAudioTrackTranscoder.stepPipeline(outputSegment, mThrottle);
+                boolean stepped = videoStepped || audioStepped;
                 outputPresentationTimeDecodedUs = Math.max(mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(),
                     mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
                 loopCount++;

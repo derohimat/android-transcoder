@@ -1,4 +1,4 @@
-// Test commit to see if file appears in repo
+// Test change to see if commit propagates
 package net.ypresto.androidtranscoder.tests;
 
 import android.os.ParcelFileDescriptor;

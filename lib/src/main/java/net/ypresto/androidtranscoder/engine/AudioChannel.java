@@ -89,6 +89,11 @@ class AudioChannel {
         }
         mEncoderBuffers = new MediaCodecBufferCompatWrapper(mEncoder);
     }
+    public void finalize () {
+        if (mEncoderBuffer != null) {
+            TLog.e(TAG, "Orphaned encoder buffer");
+        }
+    }
 
     public AudioChannel createFromExisting(final LinkedHashMap<String, MediaCodec> decoders,
                                            final MediaCodec encoder, final MediaFormat encodeFormat) {
@@ -241,6 +246,7 @@ class AudioChannel {
                 return null;
             }
             mEncoderBuffer = mEncoderBuffers.getInputBuffer(mEncoderBufferIndex).asShortBuffer();
+            TLog.v(TAG, "Got encoder buffer");
         }
 
         // Drain overflow first, just hand it over and we will process the rest next time
@@ -249,7 +255,7 @@ class AudioChannel {
             mEncoder.queueInputBuffer(mEncoderBufferIndex,
                     0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                     presentationTimeUs, 0);
-            TLog.v(TAG, "Submitting audio overflow buffer at " + presentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
+            TLog.v(TAG, "Submitting audio overflow encoder buffer at " + presentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
             presentationTimeUs += sampleCountToDurationUs(mEncoderBuffer.position());
             mEncoderBuffer = null;
             return presentationTimeUs;
@@ -281,7 +287,7 @@ class AudioChannel {
         if (!streamPresent) {
             mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
             mEncoderBuffer = null;
-            TLog.d(TAG, "Signaled Audio End of Stream to encoder");
+            TLog.d(TAG, "Submitting encoder buffer as End of Stream");
             return null;
         } else {
             if (mEncoderBuffer.limit() > 0) {
@@ -292,7 +298,7 @@ class AudioChannel {
                 mEncoder.queueInputBuffer(mEncoderBufferIndex,
                         0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                         startingPresentationTimeUs, 0);
-                TLog.v(TAG, "Submitting audio buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
+                TLog.v(TAG, "Submitting audio encoder buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
                 mOutputPresentationTimeUs = endingPresentationTimeUs;
                 mEncoderBuffer = null;
             } else {

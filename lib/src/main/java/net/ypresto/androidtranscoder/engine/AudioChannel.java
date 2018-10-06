@@ -228,13 +228,16 @@ class AudioChannel {
         // Determine whether we have an overflow buffer or filled buffer to process
         final boolean hasOverflow = mOverflowBuffer.data != null && mOverflowBuffer.data.hasRemaining();
         boolean areAllFilled = true;
+        boolean someFilled = hasOverflow;
         // All channels must have filled buffers before we mix down
         for (Map.Entry<String, Queue<AudioBuffer>> entry : mFilledBuffers.entrySet()) {
             if (entry.getValue().isEmpty()) {
                 areAllFilled = false;
+            } else {
+                someFilled = true;
             }
         }
-        if (!areAllFilled && !hasOverflow) {
+        if (!(someFilled && (areAllFilled || hasOverflow))) {
             // Not all channel's buffers filled so just hang tight 'till they are
             return null;
         }

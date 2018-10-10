@@ -48,6 +48,7 @@ public class MediaTranscoderEngine {
     private volatile double mProgress;
     private ProgressCallback mProgressCallback;
     private long mDurationUs;
+    private long mOutputPresentationTimeUs = 0l;
 
     /**
      * The throttle ensures that an encoder doesn't overrun another encoder and produce output
@@ -321,7 +322,7 @@ public class MediaTranscoderEngine {
 
     private void runPipelines(TimeLine timeLine) throws IOException, InterruptedException {
         long loopCount = 0;
-        long outputPresentationTimeDecodedUs = 0l;
+
         long outputSyncTimeUs = 0l;
         double lastProgress = -1;
         if (mDurationUs <= 0) {
@@ -332,7 +333,8 @@ public class MediaTranscoderEngine {
         }
         TimeLine.Segment previousSegment = null;
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
-            outputSegment.start(outputPresentationTimeDecodedUs, previousSegment);
+            TLog.d(TAG, "mOutputPresentationTimeUs=" + mOutputPresentationTimeUs);
+            outputSegment.start(mOutputPresentationTimeUs, previousSegment);
             previousSegment = outputSegment;
             mThrottle.startSegment();
             mAudioTrackTranscoder.setupDecoders(outputSegment, mThrottle);
@@ -342,9 +344,10 @@ public class MediaTranscoderEngine {
                 boolean videoStepped = mVideoTrackTranscoder.stepPipeline(outputSegment, mThrottle);
                 boolean audioStepped = mAudioTrackTranscoder.stepPipeline(outputSegment, mThrottle);
                 boolean stepped = videoStepped || audioStepped;
-                outputPresentationTimeDecodedUs = Math.max(mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(),
+                mOutputPresentationTimeUs = Math.max(mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(),
                     mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
                 loopCount++;
+
 
                 if (mDurationUs > 0 && loopCount % PROGRESS_INTERVAL_STEPS == 0) {
                     double progress = Math.min(1.0, (double) mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs() / mDurationUs);

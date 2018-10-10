@@ -104,6 +104,17 @@ class AudioChannel {
             if (mDecoderBuffers.containsKey(entry.getKey()))
                 audioChannel.mDecoderBuffers.put(entry.getKey(), mDecoderBuffers.get(entry.getKey()));
         }
+        for (Map.Entry<String, Queue<AudioBuffer>> entry : mFilledBuffers.entrySet()) {
+            Queue<AudioBuffer> filledBuffers = entry.getValue();
+            AudioBuffer decoderBuffer;
+            while ((decoderBuffer = filledBuffers.poll()) != null) {
+                if (decoderBuffer.bufferIndex != BUFFER_INDEX_END_OF_STREAM) {
+                    TLog.d(TAG, "Released Decoder Buffer " + decoderBuffer.bufferIndex);
+                    mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
+                }
+            }
+        }
+
         audioChannel.setActualDecodedFormat(getDeterminedFormat());
 
         return audioChannel;
@@ -259,15 +270,13 @@ class AudioChannel {
                     0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                     presentationTimeUs, 0);
             TLog.v(TAG, "Submitting audio overflow encoder buffer at " + presentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
-            presentationTimeUs += sampleCountToDurationUs(mEncoderBuffer.position());
             mEncoderBuffer = null;
             return presentationTimeUs;
         }
 
         // Go through buffers by channel and mix it down into the encoder buffer
         boolean streamPresent = false;
-        Long startingPresentationTimeUs  = mOutputPresentationTimeUs;
-        Long endingPresentationTimeUs = mOutputPresentationTimeUs;
+        Long startingPresentationTimeUs  = -1l;
         boolean append = false;
         int position = 0;
         int overflowPosition = 0;
@@ -280,8 +289,8 @@ class AudioChannel {
                         append, position, overflowPosition);
                 position = result.mBufferPosition;
                 overflowPosition = result.mBufferOverflowPosition;
-                startingPresentationTimeUs = Math.max(result.mPresentationTime, startingPresentationTimeUs);
-                endingPresentationTimeUs = startingPresentationTimeUs + sampleCountToDurationUs(decoderBuffer.data.position());
+                startingPresentationTimeUs = startingPresentationTimeUs < 0 ? result.mPresentationTime : startingPresentationTimeUs;
+                TLog.d(TAG, "Released Decoder Buffer " + decoderBuffer.bufferIndex);
                 mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
                 mEmptyBuffers.get(entry.getKey()).add(decoderBuffer);
                 append = true;
@@ -290,25 +299,25 @@ class AudioChannel {
         if (!streamPresent) {
             mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
             mEncoderBuffer = null;
-            TLog.d(TAG, "Submitting encoder buffer as End of Stream");
+            TLog.d(TAG, "Signaled Audio End of Stream to encoder");
             return null;
         } else {
             if (mEncoderBuffer.limit() > 0) {
-                if (mOutputPresentationTimeUs == startingPresentationTimeUs) {
-                    ++startingPresentationTimeUs;
-                    ++endingPresentationTimeUs;
+                if (mOutputPresentationTimeUs >= startingPresentationTimeUs) {
+                    TLog.d(TAG, "Duplicate presentation time " + startingPresentationTimeUs);
+                    startingPresentationTimeUs = mOutputPresentationTimeUs + 1; // Hack to prevent duplicates
                 }
+                mOutputPresentationTimeUs = startingPresentationTimeUs;
                 mEncoder.queueInputBuffer(mEncoderBufferIndex,
                         0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                         startingPresentationTimeUs, 0);
                 TLog.v(TAG, "Submitting audio encoder buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
-                mOutputPresentationTimeUs = endingPresentationTimeUs;
                 mEncoderBuffer = null;
             } else {
                 TLog.d(TAG, "Ignoring buffer");
                 return -1l; // ignore it
             }
-            return endingPresentationTimeUs;
+            return startingPresentationTimeUs;
         }
     }
 

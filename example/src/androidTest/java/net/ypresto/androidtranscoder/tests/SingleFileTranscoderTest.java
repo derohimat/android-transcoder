@@ -91,6 +91,22 @@ public class SingleFileTranscoderTest {
         }
     }
 
+    public void SingleFileToMono() throws InterruptedException, ExecutionException, FileNotFoundException {
+        String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFileMono.mp4";
+        cleanup(outputFileName);
+        ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+        TimeLine timeline = new TimeLine(LogLevelForTests)
+                .addChannel("A", in1.getFileDescriptor())
+                .createSegment()
+                .output("A")
+                .timeLine();
+        (MediaTranscoder.getInstance().transcodeVideo(
+                timeline, outputFileName,
+                MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, 1),
+                listener)
+        ).get();
+    }
+
     @Test()
     public void SingleFile() {
         runTest(new Transcode() {
@@ -113,21 +129,6 @@ public class SingleFileTranscoderTest {
         });
     }
 
-    public void SingleFileToMono() throws InterruptedException, ExecutionException, FileNotFoundException {
-                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFileMono.mp4";
-                cleanup(outputFileName);
-                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
-                TimeLine timeline = new TimeLine(LogLevelForTests)
-                        .addChannel("A", in1.getFileDescriptor())
-                        .createSegment()
-                        .output("A")
-                        .timeLine();
-                (MediaTranscoder.getInstance().transcodeVideo(
-                        timeline, outputFileName,
-                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, 1),
-                        listener)
-                ).get();
-    }
 
     @Test()
     public void QuadFile() {

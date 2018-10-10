@@ -208,8 +208,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
         while ((presentationTimeUs = mAudioChannel.feedEncoder(0)) != null) {
             if (presentationTimeUs >= 0) {
-                TLog.v(TAG, "Encoded audio from " + mOutputPresentationTimeDecodedUs + " to " + presentationTimeUs);
-                mOutputPresentationTimeDecodedUs = Math.max(mOutputPresentationTimeDecodedUs, presentationTimeUs);
+                TLog.v(TAG, "Encoded audio from at " + presentationTimeUs);
             } else {
                 for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
                     decoderWrapperEntry.getValue().mIsSegmentEOS = true;
@@ -308,6 +307,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
                         return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
                 }
+                TLog.d(TAG, "Dequeued Decoder Buffer " + result);
                 consumed = true;
                 long bufferInputStartTime = decoderWrapper.mBufferInfo.presentationTimeUs;
                 long bufferInputEndTime = bufferInputStartTime + mAudioChannel.getBufferDurationUs(channelName, result);
@@ -335,6 +335,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                      } else {
                         TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
+                        mOutputPresentationTimeDecodedUs = Math.max(bufferOutputTime, mOutputPresentationTimeDecodedUs);
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,
                                 inputChannel.mInputOffsetUs, inputChannel.mInputStartTimeUs, inputChannel.mInputEndTimeUs);
                     }

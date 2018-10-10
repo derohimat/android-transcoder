@@ -239,8 +239,7 @@ public class TimeLine {
         }
         public void start (Long segmentStartTimeUs, Segment previousSegment) {
 
-            mOutputStartTimeUs = Math.max(segmentStartTimeUs, previousSegment == null ? 0 :
-                previousSegment.mOutputStartTimeUs + previousSegment.getDuration());
+            mOutputStartTimeUs = segmentStartTimeUs;
 
             for (HashMap.Entry<String, SegmentChannel> segmentChannelEntry : mSegmentChannels.entrySet()) {
                 SegmentChannel segmentChannel = segmentChannelEntry.getValue();
@@ -250,7 +249,7 @@ public class TimeLine {
                 inputChannel.mInputStartTimeUs = (seek != null ?  seek : 0l) + inputChannel.mInputAcutalEndTimeUs;
                 inputChannel.mInputOffsetUs = mOutputStartTimeUs - inputChannel.mInputStartTimeUs;
                 inputChannel.mInputEndTimeUs = mDuration != null ? inputChannel.mInputStartTimeUs + mDuration : null;
-                inputChannel.mInputAcutalEndTimeUs = mOutputStartTimeUs;
+                inputChannel.mInputAcutalEndTimeUs = inputChannel.mInputStartTimeUs;
                 segmentChannel.mSeek = (seek != null) ? inputChannel.mInputStartTimeUs : null;
             }
         }

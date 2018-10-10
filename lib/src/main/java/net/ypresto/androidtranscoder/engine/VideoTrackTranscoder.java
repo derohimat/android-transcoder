@@ -212,7 +212,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             decoderWrapper.mIsSegmentEOS = false;
             if (!decoderWrapper.mDecoderStarted)
                 decoderWrapper.start();
-            TLog.d(TAG, "Video Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + (inputChannel.mInputStartTimeUs + inputChannel.mInputOffsetUs) + " ending at " + (inputChannel.mInputEndTimeUs == null ? "EOS" : inputChannel.mInputEndTimeUs + inputChannel.mInputOffsetUs));
+            TLog.d(TAG, "Video Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + inputChannel.mInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
         }
 
         // Create array of texture renderers for each patch in the segment

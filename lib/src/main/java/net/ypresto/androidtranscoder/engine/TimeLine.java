@@ -194,7 +194,7 @@ public class TimeLine {
         }
     }
 
-    public enum Filter {OPACITY_UP_RAMP, OPACITY_DOWN_RAMP};
+    public enum Filter {OPACITY_UP_RAMP, OPACITY_DOWN_RAMP, MUTE};
     public enum ChannelType {VIDEO, AUDIO, AUDIO_VIDEO, IMAGE}
 
     /**

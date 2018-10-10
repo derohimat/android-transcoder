@@ -358,7 +358,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                 // Seek at least to previous key frame if needed cause it's a lot faster
                 TimeLine.SegmentChannel segmentChannel = segment.getSegmentChannel(channelName);
                 Long seek = segmentChannel.getVideoSeek();
-                if (seek != null && sampleTime < seek) {
+                if (seek != null && (sampleTime + 500000) < seek) {
                     decoderWrapper.mExtractor.seekTo(seek, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
                     segmentChannel.seekRequestedVideo(); // So we don't repeat
                     TLog.d(TAG, "Extractor Seek " + seek);

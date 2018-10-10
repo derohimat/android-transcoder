@@ -265,7 +265,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                 // Seek at least to previous key frame if needed cause it's a lot faster
                 TimeLine.SegmentChannel segmentChannel = segment.getSegmentChannel(channelName);
                 Long seek = segmentChannel.getAudioSeek();
-                if (seek != null && sampleTime < seek) {
+                if (seek != null && (sampleTime + 500000) < seek) {
                     decoderWrapper.mExtractor.seekTo(seek, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
                     segmentChannel.seekRequestedAudio(); // So we don't repeat
                     TLog.d(TAG, "Extractor Seek " + seek);

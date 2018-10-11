@@ -437,13 +437,13 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             consumed = true;
                             TLog.v(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
-                            inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
+                            inputChannel.mInputAcutalEndTimeUs = Math.max(inputChannel.mInputAcutalEndTimeUs, bufferInputEndTime);
 
                             // Seeking - release it without rendering
                         } else {
                             TLog.v(TAG, "Skipping video " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
-                            inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
+                            inputChannel.mInputAcutalEndTimeUs = Math.max(inputChannel.mInputAcutalEndTimeUs, bufferInputEndTime);
                         }
                     }
                     mPreviousOutputPresentationTimeDecodedUs = mOutputPresentationTimeDecodedUs;

@@ -109,7 +109,7 @@ class AudioChannel {
             AudioBuffer decoderBuffer;
             while ((decoderBuffer = filledBuffers.poll()) != null) {
                 if (decoderBuffer.bufferIndex != BUFFER_INDEX_END_OF_STREAM) {
-                    TLog.d(TAG, "Released Decoder Buffer " + decoderBuffer.bufferIndex);
+                    TLog.v(TAG, "Released Decoder Buffer " + decoderBuffer.bufferIndex);
                     try {
                         mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
                     } catch (Exception e) {

@@ -305,9 +305,10 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
                         mAudioChannel.setActualDecodedFormat(decoderWrapper.mDecoder.getOutputFormat());
                     case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
+                        TLog.d(TAG, "INFO_OUTPUT_BUFFERS_CHANGED for decoder " + channelName);
                         return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY;
                 }
-                TLog.d(TAG, "Dequeued Decoder Buffer " + result);
+                TLog.v(TAG, "Dequeued Decoder Buffer " + result);
                 consumed = true;
                 long bufferInputStartTime = decoderWrapper.mBufferInfo.presentationTimeUs;
                 long bufferInputEndTime = bufferInputStartTime + mAudioChannel.getBufferDurationUs(channelName, result);
@@ -329,17 +330,16 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
                     // If we are before start skip entirely
                     if (bufferInputStartTime < inputChannel.mInputStartTimeUs) {
-                        inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                         TLog.v(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
 
                      } else {
                         TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
-                        inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
                         mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,
                                 inputChannel.mInputOffsetUs, inputChannel.mInputStartTimeUs, inputChannel.mInputEndTimeUs);
                     }
+                    inputChannel.mInputAcutalEndTimeUs = Math.max(inputChannel.mInputAcutalEndTimeUs, bufferInputEndTime);
                 }
             }
         }

@@ -312,6 +312,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                 long bufferInputStartTime = decoderWrapper.mBufferInfo.presentationTimeUs;
                 long bufferInputEndTime = bufferInputStartTime + mAudioChannel.getBufferDurationUs(channelName, result);
                 long bufferOutputTime = bufferInputStartTime + inputChannel.mInputOffsetUs;
+                long bufferOutputEndTime = bufferInputEndTime + inputChannel.mInputOffsetUs;
 
                 // End of stream - requeue the buffer
                 if ((decoderWrapper.mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -335,7 +336,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                      } else {
                         TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
-                        mOutputPresentationTimeDecodedUs = Math.max(bufferOutputTime, mOutputPresentationTimeDecodedUs);
+                        mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,
                                 inputChannel.mInputOffsetUs, inputChannel.mInputStartTimeUs, inputChannel.mInputEndTimeUs);
                     }

@@ -404,6 +404,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                     long frameLength = mOutputPresentationTimeDecodedUs - mPreviousOutputPresentationTimeDecodedUs;
                     long bufferInputEndTime = bufferInputStartTime + frameLength;
                     long bufferOutputTime = bufferInputStartTime + inputChannel.mInputOffsetUs;
+                    long bufferOutputEndTime = bufferInputEndTime + inputChannel.mInputOffsetUs;
 
                     // See if encoder is end-of-stream and propogage to output surface
                     if ((decoderWrapper.mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -435,7 +436,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             ++mTexturesReady;
                             consumed = true;
                             TLog.v(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
-                            mOutputPresentationTimeDecodedUs = Math.max(bufferOutputTime, mOutputPresentationTimeDecodedUs);
+                            mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
                             inputChannel.mInputAcutalEndTimeUs = bufferInputEndTime;
 
                             // Seeking - release it without rendering

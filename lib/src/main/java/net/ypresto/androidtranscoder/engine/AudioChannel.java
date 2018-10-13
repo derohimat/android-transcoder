@@ -294,7 +294,7 @@ class AudioChannel {
                 position = result.mBufferPosition;
                 overflowPosition = result.mBufferOverflowPosition;
                 startingPresentationTimeUs = startingPresentationTimeUs < 0 ? result.mPresentationTime : startingPresentationTimeUs;
-                TLog.d(TAG, "Released Decoder Buffer " + decoderBuffer.bufferIndex);
+                TLog.v(TAG, "Released Decoder Buffer " + decoderBuffer.bufferIndex);
                 mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
                 mEmptyBuffers.get(entry.getKey()).add(decoderBuffer);
                 append = true;

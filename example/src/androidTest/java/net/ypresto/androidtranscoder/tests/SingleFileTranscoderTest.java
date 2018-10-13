@@ -211,6 +211,49 @@ public class SingleFileTranscoderTest {
             }
         });
     }
+    @Test()
+    public void CrossfadeStitchMute() {
+        runTest(new Transcode() {
+            @Override
+            public void run() throws IOException, InterruptedException, ExecutionException {
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_CrossfadeStitch.mp4";
+                cleanup(outputFileName);
+                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+                ParcelFileDescriptor in2 = ParcelFileDescriptor.open(new File(inputFileName2), ParcelFileDescriptor.MODE_READ_ONLY);
+                TimeLine timeline = new TimeLine(LogLevelForTests)
+                        .addChannel("A", in1.getFileDescriptor())
+                        .addChannel("B", in1.getFileDescriptor())
+                        .addChannel("C", in1.getFileDescriptor())
+                        .addAudioOnlyChannel("D", in2.getFileDescriptor())
+                        .createSegment()
+                        .output("C")
+                        .output("D")
+                        .duration(1000)
+                        .timeLine().createSegment()
+                        .output("C", TimeLine.Filter.OPACITY_DOWN_RAMP)
+                        .output("A", TimeLine.Filter.OPACITY_UP_RAMP)
+                        .output("D")
+                        .duration(2000)
+                        .timeLine().createSegment()
+                        .duration(1500)
+                        .output("A",TimeLine.Filter.MUTE)
+                        .output("D")
+                        .timeLine().createSegment()
+                        .seek("B", 1000)
+                        .output("B")
+                        .duration(1500)
+                        .output("D")
+                        .timeLine();
+                (MediaTranscoder.getInstance().transcodeVideo(
+                        timeline, outputFileName,
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(
+                                Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS,
+                                Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
+                        listener)
+                ).get();
+            }
+        });
+    }
 
     @Test()
     public void CrossfadeStitchDownMix() {

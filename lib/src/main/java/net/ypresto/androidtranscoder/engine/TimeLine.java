@@ -203,6 +203,7 @@ public class TimeLine {
     public class InputChannel {
         public Long mLengthUs;  // Length based on metadata
         public Long mInputStartTimeUs = 0l;
+        public Long mAudioInputStartTimeUs = 0l;
         public Long mInputEndTimeUs;
         public Long mInputAcutalEndTimeUs =0l;
         public Long mInputOffsetUs;
@@ -245,8 +246,10 @@ public class TimeLine {
                 SegmentChannel segmentChannel = segmentChannelEntry.getValue();
                 String channelName = segmentChannelEntry.getKey();
                 Long seek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : null;
-                 InputChannel inputChannel = segmentChannel.mChannel;
+                InputChannel inputChannel = segmentChannel.mChannel;
                 inputChannel.mInputStartTimeUs = (seek != null ?  seek : 0l) + inputChannel.mInputAcutalEndTimeUs;
+                inputChannel.mAudioInputStartTimeUs = segmentChannel.mFilter == Filter.MUTE
+                        ? inputChannel.mInputStartTimeUs + mDuration : inputChannel.mInputStartTimeUs;
                 inputChannel.mInputOffsetUs = mOutputStartTimeUs - inputChannel.mInputStartTimeUs;
                 inputChannel.mInputEndTimeUs = mDuration != null ? inputChannel.mInputStartTimeUs + mDuration : null;
                 inputChannel.mInputAcutalEndTimeUs = inputChannel.mInputStartTimeUs;

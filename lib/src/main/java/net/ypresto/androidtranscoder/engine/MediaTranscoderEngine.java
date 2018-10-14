@@ -56,9 +56,9 @@ public class MediaTranscoderEngine {
      * presentation time and all decoder actions must yield a presentation time at least that
      * high or they must re-queue the buffer until they catch up
      */
-    private long ThrottleLimit = 250000l;
+    private long ThrottleLimit = 500000l;
     private long ThrottleSeed = 24l * 60l * 60l * 1000000l;
-    private long maxBlockTime = 5000000l;
+    private long maxBlockTime = 5000l;
     public class TranscodeThrottle {
         private long mPresentationThreshold = ThrottleLimit;
         private Date mBlockedStartTime = null;
@@ -69,6 +69,7 @@ public class MediaTranscoderEngine {
         public void participate (String channel) {
             mLowestPresentationTime.put(channel, null);
         }
+        public void departicpate (String channel) { mLowestPresentationTime.remove(channel);}
         public void startSegment() {
             mLowestPresentationTime = new LinkedHashMap<String, Long>();
         }
@@ -78,11 +79,7 @@ public class MediaTranscoderEngine {
             mLowestPresentationTime.put(channel, endOfStream ? -1 : presentationTime);
 
             // If not too far ahead of target allow processing
-            if (presentationTime <= mPresentationThreshold) {
-                    mBufferProcessed = true;
-                    return true;
-            } else
-                return false;
+            return presentationTime <= mPresentationThreshold;
         }
 
         public void step() {
@@ -98,6 +95,8 @@ public class MediaTranscoderEngine {
                     newPresentationThreshold = entry.getValue();
             }
             if (allChannelsReporting) {
+                if (mPresentationThreshold != newPresentationThreshold + ThrottleLimit)
+                    mBufferProcessed = true;
                 mPresentationThreshold = newPresentationThreshold + ThrottleLimit;
                 for (Map.Entry<String, Long> entry : mLowestPresentationTime.entrySet()) {
                     entry.setValue(null);

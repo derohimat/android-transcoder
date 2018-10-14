@@ -295,10 +295,10 @@ class AudioChannel {
                 overflowPosition = result.mBufferOverflowPosition;
                 startingPresentationTimeUs = startingPresentationTimeUs < 0 ? result.mPresentationTime : startingPresentationTimeUs;
                 TLog.v(TAG, "Released Decoder Buffer " + decoderBuffer.bufferIndex);
-                mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
                 mEmptyBuffers.get(entry.getKey()).add(decoderBuffer);
                 append = true;
             }
+            mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
         }
         if (!streamPresent) {
             mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);

@@ -291,13 +291,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             if (throttle.canProceed("Audio" + channelName, mOutputPresentationTimeDecodedUs, decoderWrapper.mIsDecoderEOS) &&
                 !decoderWrapper.mIsDecoderEOS && !decoderWrapper.mIsSegmentEOS) {
 
-                if (inputChannel.mInputEndTimeUs != null &&
-                        mOutputPresentationTimeDecodedUs - inputChannel.mInputOffsetUs > inputChannel.mInputEndTimeUs) {
-                    decoderWrapper.mIsSegmentEOS = true;
-                    TLog.d(TAG, "End of segment audio " + mOutputPresentationTimeDecodedUs + " for decoder " + channelName);
-                    continue;
-                }
-
                 int result = decoderWrapper.dequeueOutputBuffer(timeoutUs);
                 switch (result) {
                     case MediaCodec.INFO_TRY_AGAIN_LATER:
@@ -319,11 +312,18 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                 if ((decoderWrapper.mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     decoderWrapper.mIsDecoderEOS = true;
                     segment.forceEndOfStream(mOutputPresentationTimeDecodedUs);
-                    decoderWrapper.requeueOutputBuffer();
                     if (mIsLastSegment)
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l);
+                    else
+                        decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                     mAudioChannel.removeBuffers(channelName);
                     TLog.d(TAG, "Audio End of Stream audio " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
+
+                // Detect end of segment
+                } else if (inputChannel.mInputEndTimeUs != null && bufferInputStartTime >= inputChannel.mInputEndTimeUs) {
+                        decoderWrapper.requeueOutputBuffer();
+                        decoderWrapper.mIsSegmentEOS = true;
+                        TLog.d(TAG, "End of Segment video " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs + " for video decoder " + channelName);
 
                 // Process a buffer with data
                 } else if (decoderWrapper.mBufferInfo.size > 0) {
@@ -332,7 +332,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     if (bufferInputStartTime < inputChannel.mAudioInputStartTimeUs) {
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                         TLog.v(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
-
+                        throttle.canProceed("Audio" + channelName, bufferOutputEndTime, decoderWrapper.mIsDecoderEOS);
                      } else {
                         TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);

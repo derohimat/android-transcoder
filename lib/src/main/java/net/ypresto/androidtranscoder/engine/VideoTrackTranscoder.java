@@ -444,6 +444,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             TLog.v(TAG, "Skipping video " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                             inputChannel.mInputAcutalEndTimeUs = Math.max(inputChannel.mInputAcutalEndTimeUs, bufferInputEndTime);
+                            throttle.canProceed("Video" + channelName, bufferOutputTime, decoderWrapper.mIsDecoderEOS);
                         }
                     }
                     mPreviousOutputPresentationTimeDecodedUs = mOutputPresentationTimeDecodedUs;

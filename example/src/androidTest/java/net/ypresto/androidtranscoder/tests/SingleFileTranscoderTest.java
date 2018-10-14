@@ -225,25 +225,25 @@ public class SingleFileTranscoderTest {
                         .addChannel("B", in1.getFileDescriptor())
                         .addChannel("C", in1.getFileDescriptor())
                         .addAudioOnlyChannel("D", in2.getFileDescriptor())
-                        .createSegment()
+                .createSegment()
                         .output("C")
                         .output("D")
                         .duration(1000)
-                        .timeLine().createSegment()
+                .timeLine().createSegment()
                         .output("C", TimeLine.Filter.OPACITY_DOWN_RAMP)
                         .output("A", TimeLine.Filter.OPACITY_UP_RAMP)
                         .output("D")
                         .duration(2000)
-                        .timeLine().createSegment()
+                .timeLine().createSegment()
                         .duration(1500)
                         .output("A",TimeLine.Filter.MUTE)
                         .output("D")
-                        .timeLine().createSegment()
+                .timeLine().createSegment()
                         .seek("B", 1000)
                         .output("B")
                         .duration(1500)
                         .output("D")
-                        .timeLine();
+                .timeLine();
                 (MediaTranscoder.getInstance().transcodeVideo(
                         timeline, outputFileName,
                         MediaFormatStrategyPresets.createAndroid16x9Strategy720P(

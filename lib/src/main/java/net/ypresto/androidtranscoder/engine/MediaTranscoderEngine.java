@@ -56,7 +56,7 @@ public class MediaTranscoderEngine {
      * presentation time and all decoder actions must yield a presentation time at least that
      * high or they must re-queue the buffer until they catch up
      */
-    private long ThrottleLimit = 500000l;
+    private long ThrottleLimit = 100000l;
     private long ThrottleSeed = 24l * 60l * 60l * 1000000l;
     private long maxBlockTime = 5000l;
     public class TranscodeThrottle {

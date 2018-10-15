@@ -202,11 +202,11 @@ public class TimeLine {
      */
     public class InputChannel {
         public Long mLengthUs;  // Length based on metadata
-        public Long mInputStartTimeUs = 0l;
+        public Long mVideoInputStartTimeUs = 0l;
         public Long mAudioInputStartTimeUs = 0l;
         public Long mInputEndTimeUs = 0l;
-        public Long mInputAcutalEndTimeUs =0l;
-        public Long mInputOffsetUs;
+        public Long mVideoInputOffsetUs = 0l;
+        public Long mAudioInputOffsetUs = 0l;
         public ChannelType mChannelType;
         public FileDescriptor mInputFileDescriptor = null;
 
@@ -247,26 +247,34 @@ public class TimeLine {
                 SegmentChannel segmentChannel = segmentChannelEntry.getValue();
                 String channelName = segmentChannelEntry.getKey();
 
-                Long seek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l;
+                Long videoSeek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l;
+                Long audioSeek = segmentChannel.mFilter == Filter.MUTE ? videoSeek + mDuration : videoSeek;
                 Long duration = getDuration();
                 InputChannel inputChannel = segmentChannel.mChannel;
 
-                inputChannel.mInputStartTimeUs = seek + inputChannel.mInputEndTimeUs;
-                inputChannel.mAudioInputStartTimeUs = segmentChannel.mFilter == Filter.MUTE
-                        ? inputChannel.mInputStartTimeUs + mDuration : inputChannel.mInputStartTimeUs;
+                boolean firstSegment = inputChannel.mInputEndTimeUs == 0l;
 
-                inputChannel.mInputOffsetUs = mOutputStartTimeUs - (seek + inputChannel.mInputAcutalEndTimeUs);
+                inputChannel.mVideoInputStartTimeUs = videoSeek + inputChannel.mInputEndTimeUs;
+                inputChannel.mAudioInputStartTimeUs = audioSeek + inputChannel.mInputEndTimeUs;
 
-                inputChannel.mInputEndTimeUs = inputChannel.mInputStartTimeUs + duration;
-                inputChannel.mInputAcutalEndTimeUs = inputChannel.mInputStartTimeUs;
-                segmentChannel.mSeek = (seek > 0) ? inputChannel.mInputStartTimeUs : null;
+                if (firstSegment) {
+                    inputChannel.mVideoInputOffsetUs = mOutputStartTimeUs - inputChannel.mVideoInputStartTimeUs;
+                    inputChannel.mAudioInputOffsetUs = mOutputStartTimeUs - inputChannel.mAudioInputStartTimeUs;
+                } else {
+                    inputChannel.mVideoInputOffsetUs -= videoSeek;
+                    inputChannel.mAudioInputOffsetUs -= audioSeek;
+                }
+
+
+                inputChannel.mInputEndTimeUs = inputChannel.mVideoInputStartTimeUs + duration;
+                segmentChannel.mSeek = (videoSeek > 0) ? inputChannel.mVideoInputStartTimeUs : null;
             }
         }
 
         public void forceEndOfStream(long outputPresentationTime) {
             for (HashMap.Entry<String, SegmentChannel> segmentChannelEntry : mSegmentChannels.entrySet()) {
                 InputChannel inputChannel = segmentChannelEntry.getValue().mChannel;
-                inputChannel.mInputEndTimeUs = outputPresentationTime - inputChannel.mInputOffsetUs;
+                inputChannel.mInputEndTimeUs = outputPresentationTime - inputChannel.mVideoInputOffsetUs;
             }
         }
 

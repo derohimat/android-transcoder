@@ -173,9 +173,9 @@ class AudioChannel {
         }
 
         // Get actual decoded data
-        final ByteBuffer data =
+        final ShortBuffer data =
                 bufferIndex == BUFFER_INDEX_END_OF_STREAM ?
-                        null : decoderBuffer.getOutputBuffer(bufferIndex);
+                        null : decoderBuffer.getOutputBuffer(bufferIndex).asShortBuffer();
 
         return data == null ? 0l : sampleCountToDurationUs(data.limit());
 

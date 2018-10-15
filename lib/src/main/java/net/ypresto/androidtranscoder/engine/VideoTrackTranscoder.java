@@ -212,7 +212,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             decoderWrapper.mIsSegmentEOS = false;
             if (!decoderWrapper.mDecoderStarted)
                 decoderWrapper.start();
-            TLog.d(TAG, "Video Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + inputChannel.mInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
+            TLog.d(TAG, "Video Decoder " + channelName + " at offset " + inputChannel.mVideoInputOffsetUs + " starting at " + inputChannel.mVideoInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
         }
 
         // Create array of texture renderers for each patch in the segment
@@ -403,8 +403,8 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                     long bufferInputStartTime = decoderWrapper.mBufferInfo.presentationTimeUs;
                     long frameLength = mOutputPresentationTimeDecodedUs - mPreviousOutputPresentationTimeDecodedUs;
                     long bufferInputEndTime = bufferInputStartTime + frameLength;
-                    long bufferOutputTime = bufferInputStartTime + inputChannel.mInputOffsetUs;
-                    long bufferOutputEndTime = bufferInputEndTime + inputChannel.mInputOffsetUs;
+                    long bufferOutputTime = bufferInputStartTime + inputChannel.mVideoInputOffsetUs;
+                    long bufferOutputEndTime = bufferInputEndTime + inputChannel.mVideoInputOffsetUs;
 
                     // See if encoder is end-of-stream and propogage to output surface
                     if ((decoderWrapper.mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -428,7 +428,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             TLog.d(TAG, "End of Segment video " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs + " for video decoder " + channelName);
                             mTextures = 1; // Write if there is a texture
 
-                         } else if (doRender && decoderWrapper.mBufferInfo.presentationTimeUs >= inputChannel.mInputStartTimeUs) {
+                         } else if (doRender && decoderWrapper.mBufferInfo.presentationTimeUs >= inputChannel.mVideoInputStartTimeUs) {
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, true);
                             decoderWrapper.mOutputSurface.awaitNewImage();
                             decoderWrapper.mOutputSurface.setTextureReady();
@@ -437,13 +437,11 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             consumed = true;
                             TLog.v(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
-                            inputChannel.mInputAcutalEndTimeUs = Math.max(inputChannel.mInputAcutalEndTimeUs, bufferInputEndTime);
 
                             // Seeking - release it without rendering
                         } else {
                             TLog.v(TAG, "Skipping video " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
-                            inputChannel.mInputAcutalEndTimeUs = Math.max(inputChannel.mInputAcutalEndTimeUs, bufferInputEndTime);
                             throttle.canProceed("Video" + channelName, bufferOutputTime, decoderWrapper.mIsDecoderEOS);
                         }
                     }

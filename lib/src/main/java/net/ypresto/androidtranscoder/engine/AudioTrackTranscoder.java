@@ -9,7 +9,6 @@ import net.ypresto.androidtranscoder.compat.MediaCodecBufferCompatWrapper;
 import net.ypresto.androidtranscoder.utils.MediaExtractorUtils;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -173,7 +172,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             if (decoderWrapper.mIsDecoderEOS) {
                 TLog.d(TAG, "Audio Decoder " + channelName + " is at EOS -- dropping");
             } else {
-                TLog.d(TAG, "Audio Decoder " + channelName + " at offset " + inputChannel.mInputOffsetUs + " starting at " + inputChannel.mAudioInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
+                TLog.d(TAG, "Audio Decoder " + channelName + " at offset " + inputChannel.mAudioInputOffsetUs + " starting at " + inputChannel.mAudioInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
                 decoderWrapper.mIsSegmentEOS = false;
                 decoders.put(entry.getKey(), decoderWrapper.mDecoder);
             }
@@ -305,8 +304,8 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                 consumed = true;
                 long bufferInputStartTime = decoderWrapper.mBufferInfo.presentationTimeUs;
                 long bufferInputEndTime = bufferInputStartTime + mAudioChannel.getBufferDurationUs(channelName, result);
-                long bufferOutputTime = bufferInputStartTime + inputChannel.mInputOffsetUs;
-                long bufferOutputEndTime = bufferInputEndTime + inputChannel.mInputOffsetUs;
+                long bufferOutputTime = bufferInputStartTime + inputChannel.mAudioInputOffsetUs;
+                long bufferOutputEndTime = bufferInputEndTime + inputChannel.mAudioInputOffsetUs;
 
                 // End of stream - requeue the buffer
                 if ((decoderWrapper.mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -332,14 +331,13 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     if (bufferInputStartTime < inputChannel.mAudioInputStartTimeUs) {
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                         TLog.v(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
-                        throttle.canProceed("Audio" + channelName, bufferOutputEndTime, decoderWrapper.mIsDecoderEOS);
+                        throttle.canProceed("Audio" + channelName, bufferInputEndTime + inputChannel.mVideoInputOffsetUs, decoderWrapper.mIsDecoderEOS);
                      } else {
                         TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,
-                                inputChannel.mInputOffsetUs, inputChannel.mAudioInputStartTimeUs, inputChannel.mInputEndTimeUs);
+                                inputChannel.mAudioInputOffsetUs, inputChannel.mAudioInputStartTimeUs, inputChannel.mInputEndTimeUs);
                     }
-                    inputChannel.mInputAcutalEndTimeUs = Math.max(inputChannel.mInputAcutalEndTimeUs, bufferInputEndTime);
                 }
             }
         }

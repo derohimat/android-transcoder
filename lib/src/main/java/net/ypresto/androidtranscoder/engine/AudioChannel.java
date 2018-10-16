@@ -68,7 +68,7 @@ class AudioChannel {
     
     private ShortBuffer mEncoderBuffer;
     private int mEncoderBufferIndex;
-    private long mOutputPresentationTimeUs = 0l;
+    private long mOutputPresentationTimeUs = -1l;
 
     public AudioChannel(final LinkedHashMap<String, MediaCodec> decoders,
                         final MediaCodec encoder, final MediaFormat encodeFormat) {

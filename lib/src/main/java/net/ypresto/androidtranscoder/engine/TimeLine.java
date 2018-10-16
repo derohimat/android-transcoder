@@ -257,14 +257,8 @@ public class TimeLine {
                 inputChannel.mVideoInputStartTimeUs = videoSeek + inputChannel.mInputEndTimeUs;
                 inputChannel.mAudioInputStartTimeUs = audioSeek + inputChannel.mInputEndTimeUs;
 
-                if (firstSegment) {
-                    inputChannel.mVideoInputOffsetUs = mOutputStartTimeUs - inputChannel.mVideoInputStartTimeUs;
-                    inputChannel.mAudioInputOffsetUs = mOutputStartTimeUs - inputChannel.mAudioInputStartTimeUs;
-                } else {
-                    inputChannel.mVideoInputOffsetUs -= videoSeek;
-                    inputChannel.mAudioInputOffsetUs -= audioSeek;
-                }
-
+                inputChannel.mVideoInputOffsetUs = mOutputStartTimeUs - inputChannel.mVideoInputStartTimeUs;
+                inputChannel.mAudioInputOffsetUs = mOutputStartTimeUs - inputChannel.mVideoInputStartTimeUs;
 
                 inputChannel.mInputEndTimeUs = inputChannel.mVideoInputStartTimeUs + duration;
                 segmentChannel.mSeek = (videoSeek > 0) ? inputChannel.mVideoInputStartTimeUs : null;

@@ -132,6 +132,232 @@ public class SingleFileTranscoderTest {
     }
 
     @Test()
+    public void SingleFileFast() {
+        runTest(new Transcode() {
+            @Override
+            public void run() throws IOException, InterruptedException, ExecutionException {
+                TLog.d(TAG, "@Test " + "SingleFileChop");
+                String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFile.mp4";
+                cleanup(outputFileName);
+                ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
+                TimeLine timeline = new TimeLine(LogLevelForTests)
+                        .addChannel("A", in1.getFileDescriptor())
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine()
+
+
+                        .createSegment()
+                        .output("A")
+                        .duration(50)
+                        .seek("A", 50)
+                        .timeLine();
+
+                (MediaTranscoder.getInstance().transcodeVideo(
+                        timeline, outputFileName,
+                        MediaFormatStrategyPresets.createAndroid16x9Strategy720P(Android16By9FormatStrategy.AUDIO_BITRATE_AS_IS, Android16By9FormatStrategy.AUDIO_CHANNELS_AS_IS),
+                        listener)
+                ).get();
+            }
+        });
+    }
+
+    @Test()
     public void QuadFile() {
         runTest(new Transcode() {
             @Override

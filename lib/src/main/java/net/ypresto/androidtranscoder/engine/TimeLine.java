@@ -240,7 +240,7 @@ public class TimeLine {
         public SegmentChannel getSegmentChannel(String channel) {
             return mSegmentChannels.get(channel);
         }
-        public void start (Long segmentStartTimeUs, Segment previousSegment) {
+        public void start (Long segmentStartTimeUs, Segment previousSegment, Long videoPresentationTime, Long audioPresentationTime) {
 
             mOutputStartTimeUs = segmentStartTimeUs;
 
@@ -273,7 +273,9 @@ public class TimeLine {
                         " AudStartIT: " + inputChannel.mAudioInputStartTimeUs +
                         " EndIT: " + inputChannel.mInputEndTimeUs +
                         " offset: " + inputChannel.mVideoInputOffsetUs + " duration: " + duration +
-                        " VidSeek: " + videoSeek + " AudSeek: " + audioSeek);
+                        " VidSeek: " + videoSeek + " AudSeek: " + audioSeek +
+                        " videoPT:" + videoPresentationTime +
+                        " audioPT:" + audioPresentationTime);
             }
         }
 

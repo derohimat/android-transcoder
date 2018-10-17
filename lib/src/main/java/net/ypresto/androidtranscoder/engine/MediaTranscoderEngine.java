@@ -117,6 +117,12 @@ public class MediaTranscoderEngine {
         public boolean shouldCancel() {
             return mShouldCancel;
         }
+        public void log() {
+            TLog.e(TAG, "Threshold " + mPresentationThreshold);
+            for (Map.Entry<String, Long> entry : mLowestPresentationTime.entrySet()) {
+                TLog.e(TAG, "Channel " + entry.getKey() + " PT:" + entry.getValue());
+            }
+        }
     }
     private TranscodeThrottle mThrottle  = new TranscodeThrottle();
 
@@ -332,7 +338,7 @@ public class MediaTranscoderEngine {
         }
         TimeLine.Segment previousSegment = null;
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
-            outputSegment.start(mOutputPresentationTimeUs, previousSegment);
+            outputSegment.start(mOutputPresentationTimeUs, previousSegment, mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(), mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
             previousSegment = outputSegment;
             mThrottle.startSegment();
             mAudioTrackTranscoder.setupDecoders(outputSegment, mThrottle);
@@ -365,6 +371,7 @@ public class MediaTranscoderEngine {
                 mThrottle.step();
                 if (mThrottle.shouldCancel()) {
                     TLog.d(TAG, "Cancel because of waiting for buffer");
+                    mThrottle.log();
                     throw new IllegalStateException("Timed out waiting for buffer");
                 }
             }

@@ -207,6 +207,8 @@ public class TimeLine {
         public Long mInputEndTimeUs = 0l;
         public Long mVideoInputOffsetUs = 0l;
         public Long mAudioInputOffsetUs = 0l;
+        public Long mVideoInputAcutalEndTimeUs =0l;
+        public Long mAudioInputAcutalEndTimeUs =0l;
         public ChannelType mChannelType;
         public FileDescriptor mInputFileDescriptor = null;
 
@@ -252,16 +254,26 @@ public class TimeLine {
                 Long duration = getDuration();
                 InputChannel inputChannel = segmentChannel.mChannel;
 
-                boolean firstSegment = inputChannel.mInputEndTimeUs == 0l;
+                inputChannel.mVideoInputStartTimeUs = videoSeek + inputChannel.mVideoInputAcutalEndTimeUs;
+                inputChannel.mAudioInputStartTimeUs = audioSeek + inputChannel.mAudioInputAcutalEndTimeUs;
 
-                inputChannel.mVideoInputStartTimeUs = videoSeek + inputChannel.mInputEndTimeUs;
-                inputChannel.mAudioInputStartTimeUs = audioSeek + inputChannel.mInputEndTimeUs;
+                Long maxEndTime = Math.max(inputChannel.mVideoInputAcutalEndTimeUs, inputChannel.mAudioInputAcutalEndTimeUs);
 
-                inputChannel.mVideoInputOffsetUs = mOutputStartTimeUs - inputChannel.mVideoInputStartTimeUs;
-                inputChannel.mAudioInputOffsetUs = mOutputStartTimeUs - inputChannel.mVideoInputStartTimeUs;
+                inputChannel.mVideoInputOffsetUs = segmentStartTimeUs - (videoSeek + maxEndTime);
+                inputChannel.mAudioInputOffsetUs = segmentStartTimeUs - (videoSeek + maxEndTime);
 
                 inputChannel.mInputEndTimeUs = inputChannel.mVideoInputStartTimeUs + duration;
+                inputChannel.mAudioInputAcutalEndTimeUs = inputChannel.mInputEndTimeUs;
+                inputChannel.mVideoInputAcutalEndTimeUs = inputChannel.mInputEndTimeUs;
+
                 segmentChannel.mSeek = (videoSeek > 0) ? inputChannel.mVideoInputStartTimeUs : null;
+
+                TLog.d(TAG, "Segment Channel " + channelName + " PT: " + segmentStartTimeUs +
+                        " VidStartIT: " + inputChannel.mVideoInputStartTimeUs +
+                        " AudStartIT: " + inputChannel.mAudioInputStartTimeUs +
+                        " EndIT: " + inputChannel.mInputEndTimeUs +
+                        " offset: " + inputChannel.mVideoInputOffsetUs + " duration: " + duration +
+                        " VidSeek: " + videoSeek + " AudSeek: " + audioSeek);
             }
         }
 

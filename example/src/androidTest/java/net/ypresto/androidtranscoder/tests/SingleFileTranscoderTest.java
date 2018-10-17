@@ -8,6 +8,7 @@ import android.test.suitebuilder.annotation.SmallTest;
 import android.util.Log;
 
 import net.ypresto.androidtranscoder.MediaTranscoder;
+import net.ypresto.androidtranscoder.TLog;
 import net.ypresto.androidtranscoder.engine.TimeLine;
 import net.ypresto.androidtranscoder.format.Android16By9FormatStrategy;
 import net.ypresto.androidtranscoder.format.Android720pFormatStrategy;
@@ -36,7 +37,7 @@ public class SingleFileTranscoderTest {
     private String inputFileName2;
     private String inputFileName3;
     private volatile String status = "not started";
-    private int LogLevelForTests = 2;//4;
+    private int LogLevelForTests = 3;//4;
 
     MediaTranscoder.Listener listener = new MediaTranscoder.Listener() {
         @Override
@@ -112,6 +113,7 @@ public class SingleFileTranscoderTest {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
+                TLog.d(TAG, "@Test " + "SingleFile");
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFile.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -129,12 +131,12 @@ public class SingleFileTranscoderTest {
         });
     }
 
-
     @Test()
     public void QuadFile() {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
+                TLog.d(TAG, "@Test " + "QuadFile");
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_QuadFile.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -173,6 +175,7 @@ public class SingleFileTranscoderTest {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
+                TLog.d(TAG, "@Test " + "CrossfadeStitch");
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_CrossfadeStitch.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -216,6 +219,7 @@ public class SingleFileTranscoderTest {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
+                TLog.d(TAG, "@Test " + "CrossfadeStitchMute");
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_CrossfadeStitch.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -260,6 +264,7 @@ public class SingleFileTranscoderTest {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
+                TLog.d(TAG, "@Test " + "CrossfadeStitchDownMix");
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_CrossfadeStitch2.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -304,6 +309,7 @@ public class SingleFileTranscoderTest {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
+                TLog.d(TAG, "@Test " + "CrossfadeStitchUpMix");
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_CrossfadeStitch3.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -348,6 +354,7 @@ public class SingleFileTranscoderTest {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
+            TLog.d(TAG, "@Test " + "HopScotch");
             String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch.mp4";
             cleanup(outputFileName);
             ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -388,6 +395,7 @@ public class SingleFileTranscoderTest {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
+                TLog.d(TAG, "@Test " + "HopScotch2");
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch2.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -420,6 +428,7 @@ public class SingleFileTranscoderTest {
         runTest(new Transcode() {
             @Override
             public void run() throws IOException, InterruptedException, ExecutionException {
+                TLog.d(TAG, "@Test " + "HopScotch3");
                 String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_HopScotch3.mp4";
                 cleanup(outputFileName);
                 ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -459,6 +468,7 @@ public void ThreeFiles() {
     runTest(new Transcode() {
         @Override
         public void run() throws IOException, InterruptedException, ExecutionException {
+            TLog.d(TAG, "@Test " + "ThreeFiles");
             String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/fish13.mp4";
             cleanup(outputFileName);
             ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File("/storage/emulated/0/DCIM/Camera/20171031_173205.mp4"), ParcelFileDescriptor.MODE_READ_ONLY);

@@ -332,7 +332,6 @@ public class MediaTranscoderEngine {
         }
         TimeLine.Segment previousSegment = null;
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
-            TLog.d(TAG, "mOutputPresentationTimeUs=" + mOutputPresentationTimeUs);
             outputSegment.start(mOutputPresentationTimeUs, previousSegment);
             previousSegment = outputSegment;
             mThrottle.startSegment();

@@ -150,8 +150,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     @Override
     public void setupDecoders(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle) {
 
-        TLog.d(TAG, "Setting up Audio Decoders for segment at " + segment.mOutputStartTimeUs + " for a duration of " + segment.getDuration());
-
         LinkedHashMap<String, MediaCodec> decoders = new LinkedHashMap<String, MediaCodec>();
 
         // Start any decoders being opened for the first time
@@ -170,9 +168,9 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                 decoderWrapper.start();
             }
             if (decoderWrapper.mIsDecoderEOS) {
-                TLog.d(TAG, "Audio Decoder " + channelName + " is at EOS -- dropping");
+                TLog.d(TAG, "setupDecoders channel:" + channelName + " is at EOS -- dropping");
             } else {
-                TLog.d(TAG, "Audio Decoder " + channelName + " at offset " + inputChannel.mAudioInputOffsetUs + " starting at " + inputChannel.mAudioInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
+                TLog.d(TAG, "setupDecoders channel: " + channelName);
                 decoderWrapper.mIsSegmentEOS = false;
                 decoders.put(entry.getKey(), decoderWrapper.mDecoder);
             }
@@ -184,7 +182,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         mIsSegmentFinished = false;
         mIsEncoderEOS = false;
         mIsLastSegment = segment.isLastSegment;
-        TLog.d(TAG, "starting an audio segment");
     }
 
     @Override
@@ -316,13 +313,16 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     else
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                     mAudioChannel.removeBuffers(channelName);
-                    TLog.d(TAG, "Audio End of Stream audio " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
+                    TLog.d(TAG, "End of Stream channel: " + channelName + " PT:" + mOutputPresentationTimeDecodedUs +
+                            " IT:" + decoderWrapper.mBufferInfo.presentationTimeUs);
 
                 // Detect end of segment
                 } else if (inputChannel.mInputEndTimeUs != null && bufferInputStartTime >= inputChannel.mInputEndTimeUs) {
                         decoderWrapper.requeueOutputBuffer();
                         decoderWrapper.mIsSegmentEOS = true;
-                        TLog.d(TAG, "End of Segment video " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs + " for video decoder " + channelName);
+                        TLog.d(TAG, "End of Segment channel: " + channelName + " PT:" + mOutputPresentationTimeDecodedUs +
+                                " " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs);
+
 
                 // Process a buffer with data
                 } else if (decoderWrapper.mBufferInfo.size > 0) {
@@ -332,7 +332,9 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                         TLog.v(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         throttle.canProceed("Audio" + channelName, bufferInputEndTime + inputChannel.mVideoInputOffsetUs, decoderWrapper.mIsDecoderEOS);
-                     } else {
+                        inputChannel.mAudioInputAcutalEndTimeUs = bufferInputEndTime;
+                    } else {
+                        inputChannel.mAudioInputAcutalEndTimeUs = bufferInputEndTime;
                         TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,

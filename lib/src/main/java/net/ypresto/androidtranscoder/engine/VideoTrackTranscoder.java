@@ -182,7 +182,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                 decoderWrapperEntry.getValue().release();
                 segment.timeLine().getChannels().get(decoderWrapperEntry.getKey()).mInputEndTimeUs = 0l;
                 iterator.remove();
-                TLog.d(TAG, "Releasing Video Decoder " + decoderWrapperEntry.getKey());
+                TLog.d(TAG, "setupDecoders Releasing Decoder " + decoderWrapperEntry.getKey());
                 return;
             }
         }
@@ -196,8 +196,6 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     @Override
     public void setupDecoders(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle) {
 
-        TLog.d(TAG, "Setting up Video Decoders for segment at " + segment.mOutputStartTimeUs + " for a duration of " + segment.getDuration());
-
           // Start any decoders being opened for the first time
 
         for (Map.Entry<String, TimeLine.InputChannel> entry : segment.getVideoChannels().entrySet()) {
@@ -210,9 +208,11 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                 mDecoderWrappers.put(channelName, decoderWrapper);
             }
             decoderWrapper.mIsSegmentEOS = false;
-            if (!decoderWrapper.mDecoderStarted)
+            if (!decoderWrapper.mDecoderStarted) {
+                TLog.d(TAG, "setupDecoders starting decoder for " + channelName);
                 decoderWrapper.start();
-            TLog.d(TAG, "Video Decoder " + channelName + " at offset " + inputChannel.mVideoInputOffsetUs + " starting at " + inputChannel.mVideoInputStartTimeUs + " ending at " + inputChannel.mInputEndTimeUs);
+            }
+
         }
 
         // Create array of texture renderers for each patch in the segment
@@ -412,7 +412,8 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                         decoderWrapper.mOutputSurface.signalEndOfInputStream();
                         decoderWrapper.mIsDecoderEOS = true;
                         segment.forceEndOfStream(mOutputPresentationTimeDecodedUs + 1);
-                        TLog.d(TAG, "End of Stream video " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
+                        TLog.d(TAG, "End of Stream channel: " + channelName + " PT:" + mOutputPresentationTimeDecodedUs +
+                                " IT:" + decoderWrapper.mBufferInfo.presentationTimeUs);
                         mTextures = 1; // Write if there is a texture
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                      } else {
@@ -425,7 +426,8 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                         if (doRender && inputChannel.mInputEndTimeUs != null && bufferInputStartTime >= inputChannel.mInputEndTimeUs) {
                             decoderWrapper.requeueOutputBuffer();
                             decoderWrapper.mIsSegmentEOS = true;
-                            TLog.d(TAG, "End of Segment video " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs + " for video decoder " + channelName);
+                            TLog.d(TAG, "End of Segment channel: " + channelName + " PT:" + mOutputPresentationTimeDecodedUs +
+                                    " " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs);
                             mTextures = 1; // Write if there is a texture
 
                          } else if (doRender && decoderWrapper.mBufferInfo.presentationTimeUs >= inputChannel.mVideoInputStartTimeUs) {
@@ -437,12 +439,14 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             consumed = true;
                             TLog.v(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
+                            inputChannel.mVideoInputAcutalEndTimeUs = bufferInputEndTime;
 
                             // Seeking - release it without rendering
                         } else {
                             TLog.v(TAG, "Skipping video " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                             throttle.canProceed("Video" + channelName, bufferOutputTime, decoderWrapper.mIsDecoderEOS);
+                            inputChannel.mVideoInputAcutalEndTimeUs = bufferInputEndTime;
                         }
                     }
                     mPreviousOutputPresentationTimeDecodedUs = mOutputPresentationTimeDecodedUs;

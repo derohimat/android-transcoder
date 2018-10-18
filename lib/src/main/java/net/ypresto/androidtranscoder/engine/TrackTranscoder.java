@@ -48,6 +48,7 @@ public interface TrackTranscoder {
      */
     long getOutputPresentationTimeDecodedUs();
 
+    void setOutputPresentationTimeDecodedUs(long presentationTimeDecodedUs);
     abstract boolean isSegmentFinished();
 
     void releaseDecoders();

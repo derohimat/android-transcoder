@@ -269,6 +269,11 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     }
 
     @Override
+    public void setOutputPresentationTimeDecodedUs(long presentationTimeDecodedUs) {
+        mOutputPresentationTimeDecodedUs = presentationTimeDecodedUs;
+    }
+
+    @Override
     public boolean isSegmentFinished() {
         return mIsSegmentFinished;
     }

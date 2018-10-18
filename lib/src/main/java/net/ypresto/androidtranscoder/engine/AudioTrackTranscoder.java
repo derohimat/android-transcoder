@@ -405,7 +405,10 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     public long getOutputPresentationTimeDecodedUs() {
         return mOutputPresentationTimeDecodedUs;
     }
-
+    @Override
+    public void setOutputPresentationTimeDecodedUs(long presentationTimeDecodedUs) {
+        mOutputPresentationTimeDecodedUs = presentationTimeDecodedUs;
+    }
     @Override
     public boolean isSegmentFinished() {
         return mIsSegmentFinished;

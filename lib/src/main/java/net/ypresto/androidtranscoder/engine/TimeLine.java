@@ -275,7 +275,7 @@ public class TimeLine {
                         " offset: " + inputChannel.mVideoInputOffsetUs + " duration: " + duration +
                         " VidSeek: " + videoSeek + " AudSeek: " + audioSeek +
                         " videoPT:" + videoPresentationTime +
-                        " audioPT:" + audioPresentationTime);
+                        " audioPT:" + audioPresentationTime + " drift:" + (videoPresentationTime - audioPresentationTime));
             }
         }
 

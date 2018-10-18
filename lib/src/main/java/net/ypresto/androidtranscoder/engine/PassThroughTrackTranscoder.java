@@ -91,7 +91,10 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
 
     @Override
     public long getOutputPresentationTimeDecodedUs() { return mOutputPresentationTimeExtractedUs; }
-
+    @Override
+    public void setOutputPresentationTimeDecodedUs(long presentationTimeDecodedUs) {
+        mOutputPresentationTimeExtractedUs = presentationTimeDecodedUs;
+    }
     @Override
     public boolean isSegmentFinished() {
         return mIsEOS;

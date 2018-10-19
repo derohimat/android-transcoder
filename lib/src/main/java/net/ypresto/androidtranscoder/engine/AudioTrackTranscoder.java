@@ -309,7 +309,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     decoderWrapper.mIsDecoderEOS = true;
                     segment.forceEndOfStream(mOutputPresentationTimeDecodedUs);
                     if (mIsLastSegment)
-                        mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l);
+                        mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l, false);
                     else
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                     mAudioChannel.removeBuffers(channelName);
@@ -338,7 +338,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                         TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,
-                                inputChannel.mAudioInputOffsetUs, inputChannel.mAudioInputStartTimeUs, inputChannel.mInputEndTimeUs);
+                                inputChannel.mAudioInputOffsetUs, inputChannel.mAudioInputStartTimeUs, inputChannel.mInputEndTimeUs, inputChannel.mFilter == TimeLine.Filter.MUTE);
                     }
                 }
             }

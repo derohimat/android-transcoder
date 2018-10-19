@@ -209,6 +209,7 @@ public class TimeLine {
         public Long mAudioInputOffsetUs = 0l;
         public Long mVideoInputAcutalEndTimeUs =0l;
         public Long mAudioInputAcutalEndTimeUs =0l;
+        public Filter mFilter;
         public ChannelType mChannelType;
         public FileDescriptor mInputFileDescriptor = null;
 
@@ -250,7 +251,7 @@ public class TimeLine {
                 String channelName = segmentChannelEntry.getKey();
 
                 Long videoSeek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l;
-                Long audioSeek = segmentChannel.mFilter == Filter.MUTE ? videoSeek + mDuration : videoSeek;
+                Long audioSeek = videoSeek; //segmentChannel.mFilter == Filter.MUTE ? videoSeek + mDuration : videoSeek;
                 Long duration = getDuration();
                 InputChannel inputChannel = segmentChannel.mChannel;
 
@@ -267,6 +268,7 @@ public class TimeLine {
                 inputChannel.mVideoInputAcutalEndTimeUs = inputChannel.mInputEndTimeUs;
 
                 segmentChannel.mSeek = (videoSeek > 0) ? inputChannel.mVideoInputStartTimeUs : null;
+                inputChannel.mFilter = segmentChannel.mFilter;
 
                 TLog.d(TAG, "Segment Channel " + channelName + " PT: " + segmentStartTimeUs +
                         " VidStartIT: " + inputChannel.mVideoInputStartTimeUs +

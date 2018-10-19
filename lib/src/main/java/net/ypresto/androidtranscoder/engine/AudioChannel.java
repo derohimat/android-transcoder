@@ -39,6 +39,7 @@ class AudioChannel {
         Long startTimeUs;
         Long endTimeUs;
         Long presentationTimeOffsetUs;
+        boolean mute;
         ShortBuffer data;
     }
     private static final String TAG = "AudioChannel";
@@ -191,7 +192,7 @@ class AudioChannel {
      * @param endTimeUs - stop time relative to input (duration)
      */
     public void drainDecoderBufferAndQueue(String input, final int bufferIndex,
-        final Long presentationTimeUs, Long presentationTimeOffsetUs, Long startTimeUs, Long endTimeUs) {
+        final Long presentationTimeUs, Long presentationTimeOffsetUs, Long startTimeUs, Long endTimeUs, boolean mute) {
 
         // Grab the buffer from the decoder
         MediaCodecBufferCompatWrapper decoderBuffer = mDecoderBuffers.get(input);
@@ -216,6 +217,7 @@ class AudioChannel {
         buffer.presentationTimeOffsetUs = presentationTimeOffsetUs;
         buffer.startTimeUs = startTimeUs;
         buffer.endTimeUs = endTimeUs;
+        buffer.mute = mute;
         buffer.data = data == null ? null : data.asShortBuffer();
 
         // Make sure we have an overflow buffer ready
@@ -391,7 +393,8 @@ class AudioChannel {
             // Overflow
             // Limit inBuff to outBuff's capacity
             inBuff.limit(outBuff.capacity());
-            outputBufferStartingPosition = mRemixer.remix(inBuff, outBuff, append, position);
+
+            outputBufferStartingPosition = mRemixer.remix(inBuff, outBuff, append, position, input.mute);
 
             // Reset limit to its own capacity & Keep position
             inBuff.limit(inBuff.capacity());
@@ -401,7 +404,7 @@ class AudioChannel {
             // NOTE: We should only reach this point when overflow buffer is empty
             final long consumedDurationUs =
                     sampleCountToDurationUs(inBuff.position());
-            overflowBufferStartingPosition = mRemixer.remix(inBuff, overflowBuff, append, overflowPosition);
+            overflowBufferStartingPosition = mRemixer.remix(inBuff, overflowBuff, append, overflowPosition, input.mute);
 
             // Seal off overflowBuff & mark limit
             overflowBuff.flip();
@@ -409,7 +412,7 @@ class AudioChannel {
             input.presentationTimeOffsetUs;
         } else {
             // No overflow
-            outputBufferStartingPosition = mRemixer.remix(inBuff, outBuff, append, position);
+            outputBufferStartingPosition = mRemixer.remix(inBuff, outBuff, append, position, input.mute);
             //outBuff.flip();
         }
 

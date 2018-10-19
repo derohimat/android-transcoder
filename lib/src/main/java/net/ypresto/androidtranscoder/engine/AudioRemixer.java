@@ -4,7 +4,7 @@ import java.nio.ShortBuffer;
 
 public class AudioRemixer {
 
-    int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position) {return 0;};
+    int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position, boolean mute) {return 0;};
 
     static final int SIGNED_SHORT_LIMIT = 32768;
     static final int UNSIGNED_SHORT_MAX = 65535;
@@ -34,7 +34,7 @@ public class AudioRemixer {
     static AudioRemixer DOWNMIX = new AudioRemixer() {
 
         @Override
-        public int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position) {
+        public int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position, boolean mute) {
             // Down-mix stereo to mono
             final int inRemaining = inSBuff.remaining() / 2;
             final int outSpace = outSBuff.remaining();
@@ -47,8 +47,12 @@ public class AudioRemixer {
                 outSBuffCopy.position(position);
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned
-                    final int aLeft = inSBuff.get();
-                    final int aRight = inSBuff.get();
+                    int aLeft = inSBuff.get();
+                    int aRight = inSBuff.get();
+                    if (mute) {
+                        aLeft = 0;
+                        aRight = 0;
+                    }
                     final int ab = outSBuffCopy.get();
                     outSBuff.put(mix(mix(aLeft, aRight), ab));
                 }
@@ -67,7 +71,7 @@ public class AudioRemixer {
 
     static AudioRemixer UPMIX = new AudioRemixer() {
         @Override
-        public int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position) {
+        public int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position, boolean mute) {
             // Up-mix mono to stereo
             final int inRemaining = inSBuff.remaining();
             final int outSpace = outSBuff.remaining() / 2;
@@ -79,8 +83,12 @@ public class AudioRemixer {
                 outSBuffCopy.position(position);
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned
-                    final int a = inSBuff.get();
-                    final int b = outSBuffCopy.get();
+                    int a = inSBuff.get();
+                    int b = outSBuffCopy.get();
+                    if (mute) {
+                        a = 0;
+                        b = 0;
+                    }
                     short m = mix(a, b);
                     outSBuff.put(m);
                     outSBuff.put(m);
@@ -99,7 +107,7 @@ public class AudioRemixer {
 
     static AudioRemixer PASSTHROUGH = new AudioRemixer() {
         @Override
-        public int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position) {
+        public int remix(final ShortBuffer inSBuff, final ShortBuffer outSBuff, boolean append, int position, boolean mute) {
 
             int outBuffStartingPosition = 0;
             if (append) {
@@ -111,10 +119,16 @@ public class AudioRemixer {
                 outSBuffCopy.position(position);
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned
-                    final int aLeft = inSBuff.get();
-                    final int aRight = inSBuff.get();
-                    final int bLeft = outSBuffCopy.get();
-                    final int bRight = outSBuffCopy.get();
+                    int aLeft = inSBuff.get();
+                    int aRight = inSBuff.get();
+                    int bLeft = outSBuffCopy.get();
+                    int bRight = outSBuffCopy.get();
+                    if (mute) {
+                        aLeft = 0;
+                        aRight = 0;
+                        bLeft = 0;
+                        bRight = 0;
+                    }
                     outSBuff.put(mix(aLeft, bLeft));
                     outSBuff.put(mix(aRight, bRight));
                 }

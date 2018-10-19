@@ -1,6 +1,7 @@
 package net.ypresto.androidtranscoder.engine;
 
 import java.nio.ShortBuffer;
+import java.util.Arrays;
 
 public class AudioRemixer {
 
@@ -136,8 +137,14 @@ public class AudioRemixer {
             } else {
 
                 // Passthrough
-                outBuffStartingPosition = outSBuff.position();
-                outSBuff.put(inSBuff);
+                if (mute) {
+                    short [] zero = new short [inSBuff.remaining()];
+                    Arrays.fill(zero, (short)0);
+                    outSBuff.put(zero);
+                } else {
+                    outBuffStartingPosition = outSBuff.position();
+                    outSBuff.put(inSBuff);
+                }
             }
             return outBuffStartingPosition;
         }

@@ -250,10 +250,15 @@ public class TimeLine {
                 SegmentChannel segmentChannel = segmentChannelEntry.getValue();
                 String channelName = segmentChannelEntry.getKey();
 
-                Long videoSeek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l;
-                Long audioSeek = videoSeek; //segmentChannel.mFilter == Filter.MUTE ? videoSeek + mDuration : videoSeek;
-                Long duration = getDuration();
+                Long seek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l;
+                 Long duration = getDuration();
                 InputChannel inputChannel = segmentChannel.mChannel;
+
+                Long videoOvershoot = inputChannel.mVideoInputAcutalEndTimeUs - inputChannel.mInputEndTimeUs;
+                Long audioOvershoot = inputChannel.mAudioInputAcutalEndTimeUs - inputChannel.mInputEndTimeUs;
+                Long videoSeek = seek - videoOvershoot;
+                Long audioSeek = seek - audioOvershoot;
+
 
                 inputChannel.mVideoInputStartTimeUs = videoSeek + inputChannel.mVideoInputAcutalEndTimeUs;
                 inputChannel.mAudioInputStartTimeUs = audioSeek + inputChannel.mAudioInputAcutalEndTimeUs;

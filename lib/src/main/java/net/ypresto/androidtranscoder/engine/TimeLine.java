@@ -209,6 +209,7 @@ public class TimeLine {
         public Long mAudioInputOffsetUs = 0l;
         public Long mVideoInputAcutalEndTimeUs =0l;
         public Long mAudioInputAcutalEndTimeUs =0l;
+        public Long mTargetPresentationTime = 0l;
         public Filter mFilter;
         public ChannelType mChannelType;
         public FileDescriptor mInputFileDescriptor = null;
@@ -254,35 +255,38 @@ public class TimeLine {
                  Long duration = getDuration();
                 InputChannel inputChannel = segmentChannel.mChannel;
 
-                Long videoOvershoot = inputChannel.mVideoInputAcutalEndTimeUs - inputChannel.mInputEndTimeUs;
-                Long audioOvershoot = inputChannel.mAudioInputAcutalEndTimeUs - inputChannel.mInputEndTimeUs;
-                Long videoSeek = seek - videoOvershoot;
-                Long audioSeek = seek - audioOvershoot;
+                Long videoOvershoot = videoPresentationTime - inputChannel.mTargetPresentationTime;
+                Long audioOvershoot = audioPresentationTime - inputChannel.mTargetPresentationTime;
+                Long videoSeek = seek + videoOvershoot;
+                Long audioSeek = seek + audioOvershoot;
 
 
-                inputChannel.mVideoInputStartTimeUs = videoSeek + inputChannel.mVideoInputAcutalEndTimeUs;
-                inputChannel.mAudioInputStartTimeUs = audioSeek + inputChannel.mAudioInputAcutalEndTimeUs;
+                inputChannel.mVideoInputStartTimeUs = videoSeek + inputChannel.mInputEndTimeUs;
+                inputChannel.mAudioInputStartTimeUs = audioSeek + inputChannel.mInputEndTimeUs;
 
-                Long maxEndTime = Math.max(inputChannel.mVideoInputAcutalEndTimeUs, inputChannel.mAudioInputAcutalEndTimeUs);
+                inputChannel.mVideoInputOffsetUs = videoPresentationTime - (videoSeek + inputChannel.mVideoInputAcutalEndTimeUs);
+                inputChannel.mAudioInputOffsetUs = audioPresentationTime - (audioSeek + inputChannel.mAudioInputAcutalEndTimeUs);
 
-                inputChannel.mVideoInputOffsetUs = segmentStartTimeUs - (videoSeek + maxEndTime);
-                inputChannel.mAudioInputOffsetUs = segmentStartTimeUs - (videoSeek + maxEndTime);
-
-                inputChannel.mInputEndTimeUs = inputChannel.mVideoInputStartTimeUs + duration;
+                inputChannel.mInputEndTimeUs = inputChannel.mInputEndTimeUs + seek + duration;
                 inputChannel.mAudioInputAcutalEndTimeUs = inputChannel.mInputEndTimeUs;
                 inputChannel.mVideoInputAcutalEndTimeUs = inputChannel.mInputEndTimeUs;
 
                 segmentChannel.mSeek = (videoSeek > 0) ? inputChannel.mVideoInputStartTimeUs : null;
                 inputChannel.mFilter = segmentChannel.mFilter;
+                inputChannel.mTargetPresentationTime += duration;
 
                 TLog.d(TAG, "Segment Channel " + channelName + " PT: " + segmentStartTimeUs +
-                        " VidStartIT: " + inputChannel.mVideoInputStartTimeUs +
-                        " AudStartIT: " + inputChannel.mAudioInputStartTimeUs +
-                        " EndIT: " + inputChannel.mInputEndTimeUs +
-                        " offset: " + inputChannel.mVideoInputOffsetUs + " duration: " + duration +
-                        " VidSeek: " + videoSeek + " AudSeek: " + audioSeek +
-                        " videoPT:" + videoPresentationTime +
-                        " audioPT:" + audioPresentationTime + " drift:" + (videoPresentationTime - audioPresentationTime));
+                        " VStart: " + inputChannel.mVideoInputStartTimeUs +
+                        " AStart: " + inputChannel.mAudioInputStartTimeUs +
+                        " End: " + inputChannel.mInputEndTimeUs +
+                        " VOff: " + inputChannel.mVideoInputOffsetUs +
+                        " AOff: " + inputChannel.mAudioInputOffsetUs +
+                        " duration: " + duration +
+                        " VSeek: " + videoSeek + " ASeek: " + audioSeek +
+                        " TPT:" + inputChannel.mTargetPresentationTime +
+                        " VPT:" + videoPresentationTime +
+                        " APT:" + audioPresentationTime +
+                        " drift:" + (videoPresentationTime - audioPresentationTime));
             }
         }
 

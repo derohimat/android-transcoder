@@ -338,11 +338,11 @@ public class MediaTranscoderEngine {
         }
         TimeLine.Segment previousSegment = null;
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
-            Long presentationTime = Math.max( mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(), mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
+            //Long presentationTime = Math.max( mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(), mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
             outputSegment.start(mOutputPresentationTimeUs, previousSegment, mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(), mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
             previousSegment = outputSegment;
-            mAudioTrackTranscoder.setOutputPresentationTimeDecodedUs(presentationTime);
-            mVideoTrackTranscoder.setOutputPresentationTimeDecodedUs(presentationTime);
+            //mAudioTrackTranscoder.setOutputPresentationTimeDecodedUs(presentationTime);
+            //mVideoTrackTranscoder.setOutputPresentationTimeDecodedUs(presentationTime);
             mThrottle.startSegment();
             mAudioTrackTranscoder.setupDecoders(outputSegment, mThrottle);
             mVideoTrackTranscoder.setupDecoders(outputSegment, mThrottle);

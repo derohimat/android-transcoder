@@ -27,6 +27,10 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    packagingOptions{
+        doNotStrip '*/mips/*.so'
+        doNotStrip '*/mips64/*.so'
+    }
 }
 
 publish {

@@ -242,9 +242,9 @@ public class TimeLine {
         public SegmentChannel getSegmentChannel(String channel) {
             return mSegmentChannels.get(channel);
         }
-        public void start (Long segmentStartTimeUs, Segment previousSegment, Long videoPresentationTime, Long audioPresentationTime) {
+        public void start (Long presentationTime, Segment previousSegment, Long videoPresentationTime, Long audioPresentationTime) {
 
-            mOutputStartTimeUs = segmentStartTimeUs;
+            mOutputStartTimeUs = presentationTime;
 
             for (HashMap.Entry<String, SegmentChannel> segmentChannelEntry : mSegmentChannels.entrySet()) {
 
@@ -252,14 +252,16 @@ public class TimeLine {
                 String channelName = segmentChannelEntry.getKey();
 
                 Long seek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l;
-                 Long duration = getDuration();
+                Long duration = getDuration();
                 InputChannel inputChannel = segmentChannel.mChannel;
 
-                Long videoOvershoot = videoPresentationTime - inputChannel.mTargetPresentationTime;
-                Long audioOvershoot = audioPresentationTime - inputChannel.mTargetPresentationTime;
+                boolean channelInPreviousSegment = previousSegment != null && previousSegment.mSegmentChannels.get(channelName)  != null;
+
+                Long overshoot = channelInPreviousSegment ? presentationTime - inputChannel.mTargetPresentationTime : 0;
+                Long videoOvershoot = channelInPreviousSegment ? videoPresentationTime - inputChannel.mTargetPresentationTime : 0;
+                Long audioOvershoot = channelInPreviousSegment ? audioPresentationTime - inputChannel.mTargetPresentationTime : 0;
                 Long videoSeek = seek + videoOvershoot;
                 Long audioSeek = seek + audioOvershoot;
-
 
                 inputChannel.mVideoInputStartTimeUs = videoSeek + inputChannel.mInputEndTimeUs;
                 inputChannel.mAudioInputStartTimeUs = audioSeek + inputChannel.mInputEndTimeUs;
@@ -273,9 +275,9 @@ public class TimeLine {
 
                 segmentChannel.mSeek = (videoSeek > 0) ? inputChannel.mVideoInputStartTimeUs : null;
                 inputChannel.mFilter = segmentChannel.mFilter;
-                inputChannel.mTargetPresentationTime += duration;
+                inputChannel.mTargetPresentationTime = presentationTime - overshoot + duration;
 
-                TLog.d(TAG, "Segment Channel " + channelName + " PT: " + segmentStartTimeUs +
+                TLog.d(TAG, "Segment Channel " + channelName + " PT: " + presentationTime +
                         " VStart: " + inputChannel.mVideoInputStartTimeUs +
                         " AStart: " + inputChannel.mAudioInputStartTimeUs +
                         " End: " + inputChannel.mInputEndTimeUs +

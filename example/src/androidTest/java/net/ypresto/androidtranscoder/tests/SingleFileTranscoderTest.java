@@ -107,7 +107,7 @@ public class SingleFileTranscoderTest {
                 listener)
         ).get();
     }
-/*
+
     @Test()
     public void SingleFile() {
         runTest(new Transcode() {
@@ -356,7 +356,7 @@ public class SingleFileTranscoderTest {
             }
         });
     }
-*/
+
     @Test()
     public void SingleFileFastMute() {
         runTest(new Transcode() {
@@ -652,7 +652,7 @@ public class SingleFileTranscoderTest {
             }
         });
     }
-/*
+
     @Test()
     public void QuadFile() {
         runTest(new Transcode() {
@@ -1023,7 +1023,7 @@ public void ThreeFiles() {
     });
 
 }
-*/
+
 
     public interface Transcode {
         void run () throws IOException, InterruptedException, ExecutionException;

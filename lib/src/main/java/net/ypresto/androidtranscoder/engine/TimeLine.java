@@ -209,7 +209,10 @@ public class TimeLine {
         public Long mAudioInputOffsetUs = 0l;
         public Long mVideoInputAcutalEndTimeUs =0l;
         public Long mAudioInputAcutalEndTimeUs =0l;
-        public Long mTargetPresentationTime = 0l;
+        public long mAudioToTrim = 0l;
+        public long mVideoFrameLength = 1000000 / 24;
+        public long mSeekShortage = 0l;
+        public long mDurationShortage = 0l;
         public Filter mFilter;
         public ChannelType mChannelType;
         public FileDescriptor mInputFileDescriptor = null;
@@ -242,7 +245,7 @@ public class TimeLine {
         public SegmentChannel getSegmentChannel(String channel) {
             return mSegmentChannels.get(channel);
         }
-        public void start (Long presentationTime, Segment previousSegment, Long videoPresentationTime, Long audioPresentationTime) {
+        public void start (Long presentationTime, Segment previousSegment, Long videoPresentationTime, Long audioPresentationTime, Long videoEncodedTime, Long audioEncodedTime) {
 
             mOutputStartTimeUs = presentationTime;
 
@@ -250,32 +253,38 @@ public class TimeLine {
 
                 SegmentChannel segmentChannel = segmentChannelEntry.getValue();
                 String channelName = segmentChannelEntry.getKey();
-
-                Long seek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l;
-                Long duration = getDuration();
                 InputChannel inputChannel = segmentChannel.mChannel;
-
                 boolean channelInPreviousSegment = previousSegment != null && previousSegment.mSegmentChannels.get(channelName)  != null;
 
-                Long overshoot = channelInPreviousSegment ? presentationTime - inputChannel.mTargetPresentationTime : 0;
-                Long videoOvershoot = channelInPreviousSegment ? videoPresentationTime - inputChannel.mTargetPresentationTime : 0;
-                Long audioOvershoot = channelInPreviousSegment ? audioPresentationTime - inputChannel.mTargetPresentationTime : 0;
-                Long videoSeek = seek + videoOvershoot;
-                Long audioSeek = seek + audioOvershoot;
+                Long actualSeek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l;
+                Long seek = (actualSeek / inputChannel.mVideoFrameLength) * inputChannel.mVideoFrameLength;
+                inputChannel.mSeekShortage += (actualSeek - seek);
+                Long seekAddition =  (inputChannel.mSeekShortage / inputChannel.mVideoFrameLength) * inputChannel.mVideoFrameLength;
+                inputChannel.mSeekShortage -= seekAddition;
+                seek += seekAddition;
 
-                inputChannel.mVideoInputStartTimeUs = videoSeek + inputChannel.mInputEndTimeUs;
-                inputChannel.mAudioInputStartTimeUs = audioSeek + inputChannel.mInputEndTimeUs;
+                Long actualDuration = getDuration();
+                Long duration = (actualDuration / inputChannel.mVideoFrameLength) * inputChannel.mVideoFrameLength;
+                inputChannel.mDurationShortage += (actualDuration - duration);
+                Long durationAddition =  (inputChannel.mDurationShortage / inputChannel.mVideoFrameLength) * inputChannel.mVideoFrameLength;
+                inputChannel.mDurationShortage -= durationAddition;
+                duration += durationAddition;
 
-                inputChannel.mVideoInputOffsetUs = videoPresentationTime - (videoSeek + inputChannel.mVideoInputAcutalEndTimeUs);
-                inputChannel.mAudioInputOffsetUs = audioPresentationTime - (audioSeek + inputChannel.mAudioInputAcutalEndTimeUs);
+                inputChannel.mVideoInputStartTimeUs = seek + inputChannel.mInputEndTimeUs;
+                inputChannel.mAudioInputStartTimeUs = seek + inputChannel.mInputEndTimeUs;
+
+                inputChannel.mVideoInputOffsetUs = videoPresentationTime - (seek + inputChannel.mVideoInputAcutalEndTimeUs);
+                inputChannel.mAudioInputOffsetUs = audioPresentationTime - (seek + inputChannel.mAudioInputAcutalEndTimeUs);
+
+                //inputChannel.mAudioInputOffsetUs = inputChannel.mVideoInputOffsetUs = presentationTime - (seek + inputChannel.mInputEndTimeUs);
 
                 inputChannel.mInputEndTimeUs = inputChannel.mInputEndTimeUs + seek + duration;
                 inputChannel.mAudioInputAcutalEndTimeUs = inputChannel.mInputEndTimeUs;
                 inputChannel.mVideoInputAcutalEndTimeUs = inputChannel.mInputEndTimeUs;
 
-                segmentChannel.mSeek = (videoSeek > 0) ? inputChannel.mVideoInputStartTimeUs : null;
+                segmentChannel.mSeek = (seek > 0) ? inputChannel.mVideoInputStartTimeUs : null;
                 inputChannel.mFilter = segmentChannel.mFilter;
-                inputChannel.mTargetPresentationTime = presentationTime - overshoot + duration;
+
 
                 TLog.d(TAG, "Segment Channel " + channelName + " PT: " + presentationTime +
                         " VStart: " + inputChannel.mVideoInputStartTimeUs +
@@ -284,10 +293,11 @@ public class TimeLine {
                         " VOff: " + inputChannel.mVideoInputOffsetUs +
                         " AOff: " + inputChannel.mAudioInputOffsetUs +
                         " duration: " + duration +
-                        " VSeek: " + videoSeek + " ASeek: " + audioSeek +
-                        " TPT:" + inputChannel.mTargetPresentationTime +
+                        " seek: " + seek + " ASeek: " +
                         " VPT:" + videoPresentationTime +
                         " APT:" + audioPresentationTime +
+                        " VET:" + videoEncodedTime +
+                        " AET:" + audioEncodedTime +
                         " drift:" + (videoPresentationTime - audioPresentationTime));
             }
         }

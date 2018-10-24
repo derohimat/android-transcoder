@@ -274,7 +274,16 @@ public class MediaTranscoderEngine {
                         duration = -1l;
                     }
                     TLog.d(TAG, "Duration of " + channelName + ": (us): " + duration);
-                    inputChannelEntry.getValue().mLengthUs = duration;
+                    inputChannel.mLengthUs = duration;
+                    MediaFormat format = videoExtractor.getTrackFormat(trackResult.mVideoTrackIndex);
+                    String mime = format.getString(MediaFormat.KEY_MIME);
+                    if (mime.startsWith("video/")) {
+                        if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
+                            long frameLength = 1000000 / format.getInteger(MediaFormat.KEY_FRAME_RATE);
+                            TLog.d(TAG, "Frame Length of " + channelName + ": " + frameLength);
+                            inputChannel.mVideoFrameLength = frameLength;
+                        }
+                    }
                 }
             }
             if (inputChannel.mChannelType == TimeLine.ChannelType.AUDIO || inputChannel.mChannelType == TimeLine.ChannelType.AUDIO_VIDEO) {
@@ -339,7 +348,9 @@ public class MediaTranscoderEngine {
         TimeLine.Segment previousSegment = null;
         for (TimeLine.Segment outputSegment : timeLine.getSegments()) {
             //Long presentationTime = Math.max( mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(), mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
-            outputSegment.start(mOutputPresentationTimeUs, previousSegment, mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(), mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs());
+            outputSegment.start(mOutputPresentationTimeUs, previousSegment,
+                    mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(), mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs(),
+                    mVideoTrackTranscoder.getOutputPresentationTimeEncodedUs(), mAudioTrackTranscoder.getOutputPresentationTimeEncodedUs());
             previousSegment = outputSegment;
             //mAudioTrackTranscoder.setOutputPresentationTimeDecodedUs(presentationTime);
             //mVideoTrackTranscoder.setOutputPresentationTimeDecodedUs(presentationTime);
@@ -383,9 +394,10 @@ public class MediaTranscoderEngine {
         TLog.d(TAG, "Releasing transcoders");
         mVideoTrackTranscoder.release();
         mAudioTrackTranscoder.release();
-        TLog.d(TAG, "Transcoders released last video presentation time decoded was " +
-                Math.max(mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs(),
-                         mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs()));
+        TLog.d(TAG, "Video PT: " + mVideoTrackTranscoder.getOutputPresentationTimeDecodedUs() +
+                " Time " + mVideoTrackTranscoder.getOutputPresentationTimeEncodedUs() +
+                " -- Audio PT:" + mAudioTrackTranscoder.getOutputPresentationTimeDecodedUs() +
+                " Time " + mAudioTrackTranscoder.getOutputPresentationTimeEncodedUs());
     }
 
     public interface ProgressCallback {

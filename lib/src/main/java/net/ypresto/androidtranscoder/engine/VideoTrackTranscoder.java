@@ -143,7 +143,8 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     private int mTexturesReady = 0;
     private int mTextures = 0;
     private long mOutputPresentationTimeDecodedUs = 0l;
-    private long mPreviousOutputPresentationTimeDecodedUs = 0l;
+    private long mOutputPresentationTimeEncodedUs = 0;
+    private long mFrameLength = 0l;
     private List <TextureRender> mTextureRender;
     private boolean mIsLastSegment = false;
     private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
@@ -267,6 +268,9 @@ public class VideoTrackTranscoder implements TrackTranscoder {
     public long getOutputPresentationTimeDecodedUs() {
         return mOutputPresentationTimeDecodedUs;
     }
+
+    @Override
+    public long getOutputPresentationTimeEncodedUs() {return mOutputPresentationTimeEncodedUs;}
 
     @Override
     public void setOutputPresentationTimeDecodedUs(long presentationTimeDecodedUs) {
@@ -406,8 +410,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                     }
                     consumed = true;
                     long bufferInputStartTime = decoderWrapper.mBufferInfo.presentationTimeUs;
-                    long frameLength = mOutputPresentationTimeDecodedUs - mPreviousOutputPresentationTimeDecodedUs;
-                    long bufferInputEndTime = bufferInputStartTime + frameLength;
+                    long bufferInputEndTime = bufferInputStartTime + inputChannel.mVideoFrameLength;
                     long bufferOutputTime = bufferInputStartTime + inputChannel.mVideoInputOffsetUs;
                     long bufferOutputEndTime = bufferInputEndTime + inputChannel.mVideoInputOffsetUs;
 
@@ -435,7 +438,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                                     " " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs);
                             mTextures = 1; // Write if there is a texture
 
-                         } else if (doRender && decoderWrapper.mBufferInfo.presentationTimeUs >= inputChannel.mVideoInputStartTimeUs) {
+                         } else if (doRender && bufferInputStartTime >= inputChannel.mVideoInputStartTimeUs) {
                             decoderWrapper.mDecoder.releaseOutputBuffer(result, true);
                             decoderWrapper.mOutputSurface.awaitNewImage();
                             decoderWrapper.mOutputSurface.setTextureReady();
@@ -445,6 +448,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             TLog.v(TAG, "Texture ready " + mOutputPresentationTimeDecodedUs + " (" + decoderWrapper.mBufferInfo.presentationTimeUs + ")" + " for decoder " + channelName);
                             mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
                             inputChannel.mVideoInputAcutalEndTimeUs = bufferInputEndTime;
+                            mFrameLength = bufferOutputEndTime - bufferOutputTime;
 
                             // Seeking - release it without rendering
                         } else {
@@ -454,7 +458,6 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                             inputChannel.mVideoInputAcutalEndTimeUs = bufferInputEndTime;
                         }
                     }
-                    mPreviousOutputPresentationTimeDecodedUs = mOutputPresentationTimeDecodedUs;
                 }
             }
         }
@@ -475,6 +478,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             mEncoderInputSurfaceWrapper.swapBuffers();
             mOutputPresentationTimeDecodedUs += 1; // Hack to ensure next one greater than current;
             mTexturesReady = 0;
+            mOutputPresentationTimeEncodedUs += mFrameLength;
         }
 
         return consumed ? DRAIN_STATE_CONSUMED : DRAIN_STATE_NONE;

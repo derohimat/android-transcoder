@@ -34,6 +34,7 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
     private boolean mIsEOS;
     private MediaFormat mActualOutputFormat;
     private long mOutputPresentationTimeExtractedUs;
+    private long mOutputPresentationTimeEncodedUs = 0;
 
     public PassThroughTrackTranscoder(MediaExtractor extractor, int trackIndex,
                                       QueuedMuxer muxer, QueuedMuxer.SampleType sampleType) {
@@ -71,6 +72,7 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
             mBuffer.clear();
             mBufferInfo.set(0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
             mMuxer.writeSampleData(mSampleType, mBuffer, mBufferInfo);
+            mOutputPresentationTimeEncodedUs = mBufferInfo.presentationTimeUs;
             mIsEOS = true;
             return true;
         }
@@ -83,6 +85,7 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
         int flags = isKeyFrame ? MediaCodec.BUFFER_FLAG_SYNC_FRAME : 0;
         mBufferInfo.set(0, sampleSize, mExtractor.getSampleTime(), flags);
         mMuxer.writeSampleData(mSampleType, mBuffer, mBufferInfo);
+        mOutputPresentationTimeEncodedUs = mBufferInfo.presentationTimeUs;
         mOutputPresentationTimeExtractedUs = mBufferInfo.presentationTimeUs;
 
         mExtractor.advance();
@@ -91,6 +94,10 @@ public class PassThroughTrackTranscoder implements TrackTranscoder {
 
     @Override
     public long getOutputPresentationTimeDecodedUs() { return mOutputPresentationTimeExtractedUs; }
+
+    @Override
+    public long getOutputPresentationTimeEncodedUs() {return mOutputPresentationTimeEncodedUs;}
+
     @Override
     public void setOutputPresentationTimeDecodedUs(long presentationTimeDecodedUs) {
         mOutputPresentationTimeExtractedUs = presentationTimeDecodedUs;

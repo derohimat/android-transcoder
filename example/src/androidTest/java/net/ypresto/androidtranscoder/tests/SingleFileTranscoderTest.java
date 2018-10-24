@@ -16,6 +16,7 @@ import net.ypresto.androidtranscoder.format.MediaFormatStrategyPresets;
 
 
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -33,13 +34,13 @@ import static org.junit.Assert.assertEquals;
 @RunWith(AndroidJUnit4.class)
 public class SingleFileTranscoderTest {
     private static final String TAG = "JUnitTranscoder";
-    private String inputFileName1;
-    private String inputFileName2;
-    private String inputFileName3;
-    private volatile String status = "not started";
-    private int LogLevelForTests = 3;//4;
+    static private String inputFileName1;
+    static private String inputFileName2;
+    static private String inputFileName3;
+    private static String status = "not started";
+    static private int LogLevelForTests = 3;
 
-    MediaTranscoder.Listener listener = new MediaTranscoder.Listener() {
+    static MediaTranscoder.Listener  listener = new MediaTranscoder.Listener() {
         @Override
         public void onTranscodeProgress(double progress) {
             //Log.d(TAG, "Progress " + progress);
@@ -60,8 +61,8 @@ public class SingleFileTranscoderTest {
     };
 
 
-    @Before
-    public void retrieveVideo ()  {
+    @BeforeClass
+    public static void retrieveVideo ()  {
         inputFileName1 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input1.mp4";
         inputFileName2 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input2.mp4";
         inputFileName3 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFileMono.mp4";
@@ -92,7 +93,8 @@ public class SingleFileTranscoderTest {
         }
     }
 
-    public void SingleFileToMono() throws InterruptedException, ExecutionException, FileNotFoundException {
+    public static void SingleFileToMono() throws InterruptedException, ExecutionException, FileNotFoundException {
+        TLog.d(TAG, "@Test " + "SingleFileToMono");
         String outputFileName = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/output_SingleFileMono.mp4";
         cleanup(outputFileName);
         ParcelFileDescriptor in1 = ParcelFileDescriptor.open(new File(inputFileName1), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -736,6 +738,7 @@ public class SingleFileTranscoderTest {
             }
         });
     }
+
     @Test()
     public void CrossfadeStitchMute() {
         runTest(new Transcode() {
@@ -1043,14 +1046,14 @@ public void ThreeFiles() {
 
 
     // Helpers
-    private void copyFile(InputStream in, OutputStream out) throws IOException {
+    private static void copyFile(InputStream in, OutputStream out) throws IOException {
         byte[] buffer = new byte[1024];
         int read;
         while((read = in.read(buffer)) != -1) {
             out.write(buffer, 0, read);
         }
     }
-    private void cleanup(String fileName) {
+    private static void cleanup(String fileName) {
         (new File(fileName)).delete();
     }
 }

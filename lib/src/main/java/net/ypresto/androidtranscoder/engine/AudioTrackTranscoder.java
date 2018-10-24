@@ -45,6 +45,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     private boolean mIsSegmentFinished;
     private boolean mIsLastSegment = false;
     private long mOutputPresentationTimeDecodedUs = 0l;
+    private long mOutputPresentationTimeEncodedUs = 0;
     private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
 
     public AudioTrackTranscoder(LinkedHashMap<String, MediaExtractor> extractor,
@@ -192,7 +193,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     @Override
     public boolean stepPipeline(TimeLine.Segment outputSegment, MediaTranscoderEngine.TranscodeThrottle throttle) {
         boolean stepped = false;
-        Long presentationTimeUs;
+        Long timeEncodedUs;
 
         int status;
         while (drainEncoder(0) != DRAIN_STATE_NONE) stepped = true;
@@ -202,9 +203,10 @@ public class AudioTrackTranscoder implements TrackTranscoder {
             // NOTE: not repeating to keep from deadlock when encoder is full.
         } while (status == DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY);
 
-        while ((presentationTimeUs = mAudioChannel.feedEncoder(0)) != null) {
-            if (presentationTimeUs >= 0) {
-                TLog.v(TAG, "Encoded audio from at " + presentationTimeUs);
+        while ((timeEncodedUs = mAudioChannel.feedEncoder(0)) != null) {
+            if (timeEncodedUs >= 0) {
+                TLog.v(TAG, "Encoded audio from at " + timeEncodedUs);
+                mOutputPresentationTimeEncodedUs += timeEncodedUs;
             } else {
                 for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
                     decoderWrapperEntry.getValue().mIsSegmentEOS = true;
@@ -309,7 +311,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     decoderWrapper.mIsDecoderEOS = true;
                     segment.forceEndOfStream(mOutputPresentationTimeDecodedUs);
                     if (mIsLastSegment)
-                        mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l, false);
+                        mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l, false, 0l);
                     else
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                     mAudioChannel.removeBuffers(channelName);
@@ -338,7 +340,8 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                         TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,
-                                inputChannel.mAudioInputOffsetUs, inputChannel.mAudioInputStartTimeUs, inputChannel.mInputEndTimeUs, inputChannel.mFilter == TimeLine.Filter.MUTE);
+                                inputChannel.mAudioInputOffsetUs, inputChannel.mAudioInputStartTimeUs, inputChannel.mInputEndTimeUs, inputChannel.mFilter == TimeLine.Filter.MUTE, inputChannel.mAudioToTrim);
+                        inputChannel.mAudioToTrim = 0l;
                     }
                 }
             }
@@ -405,6 +408,12 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     public long getOutputPresentationTimeDecodedUs() {
         return mOutputPresentationTimeDecodedUs;
     }
+
+
+    @Override
+    public long getOutputPresentationTimeEncodedUs() {return mOutputPresentationTimeEncodedUs;}
+
+
     @Override
     public void setOutputPresentationTimeDecodedUs(long presentationTimeDecodedUs) {
         mOutputPresentationTimeDecodedUs = presentationTimeDecodedUs;

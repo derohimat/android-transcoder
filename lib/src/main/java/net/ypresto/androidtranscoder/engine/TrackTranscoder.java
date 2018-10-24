@@ -47,6 +47,7 @@ public interface TrackTranscoder {
      * @return Presentation time in micro-second. Return value is undefined if finished writing.
      */
     long getOutputPresentationTimeDecodedUs();
+    long getOutputPresentationTimeEncodedUs();
 
     void setOutputPresentationTimeDecodedUs(long presentationTimeDecodedUs);
     abstract boolean isSegmentFinished();

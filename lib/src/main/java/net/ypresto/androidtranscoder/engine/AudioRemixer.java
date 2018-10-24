@@ -137,12 +137,12 @@ public class AudioRemixer {
             } else {
 
                 // Passthrough
+                outBuffStartingPosition = outSBuff.position();
                 if (mute) {
                     short [] zero = new short [inSBuff.remaining()];
                     Arrays.fill(zero, (short)0);
                     outSBuff.put(zero);
                 } else {
-                    outBuffStartingPosition = outSBuff.position();
                     outSBuff.put(inSBuff);
                 }
             }

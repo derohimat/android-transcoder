@@ -37,12 +37,11 @@ class AudioChannel {
     private static class AudioBuffer {
         int bufferIndex;
         Long presentationTimeUs;
-        Long startTimeUs;
-        Long endTimeUs;
         Long presentationTimeOffsetUs;
         boolean mute;
         ShortBuffer data;
     }
+
     private static final String TAG = "AudioChannel";
     public static final int BUFFER_INDEX_END_OF_STREAM = -1;
 
@@ -189,11 +188,12 @@ class AudioChannel {
      * @param bufferIndex - decoder buffer index
      * @param presentationTimeUs - presentation time for output purposes
      * @param presentationTimeOffsetUs - presentation time offset relative to output
-     * @param startTimeUs - start time relative to input (seek)
-     * @param endTimeUs - stop time relative to input (duration)
+     * @param mute - if true mute track
+     * @param skipFirstUs - amount to skip at start of buffer
+     * @param skipLastUs - amount to skip at end of buffer
      */
     public void drainDecoderBufferAndQueue(String input, final int bufferIndex,
-        final Long presentationTimeUs, Long presentationTimeOffsetUs, Long startTimeUs, Long endTimeUs, boolean mute, long trim) {
+        final Long presentationTimeUs, Long presentationTimeOffsetUs, boolean mute, long skipFirstUs, long skipLastUs) {
 
         // Grab the buffer from the decoder
         MediaCodecBufferCompatWrapper decoderBuffer = mDecoderBuffers.get(input);
@@ -202,9 +202,9 @@ class AudioChannel {
         }
 
         // Get actual decoded data
-        final ByteBuffer data =
+        final ShortBuffer data =
                 bufferIndex == BUFFER_INDEX_END_OF_STREAM ?
-                        null : decoderBuffer.getOutputBuffer(bufferIndex);
+                        null : decoderBuffer.getOutputBuffer(bufferIndex).asShortBuffer();
 
         // Grab an empty buffer (recycled) or create a new one
         AudioBuffer buffer = mEmptyBuffers.get(input).poll();
@@ -212,25 +212,22 @@ class AudioChannel {
             buffer = new AudioBuffer();
         }
 
-        if (trim > 0) {
-
-        } else if (trim < 0) {
-
-        }
+        if (skipFirstUs > 0)
+            data.position(durationToSampleCount(skipFirstUs));
+        if (skipLastUs > 0)
+            data.limit(data.limit() - durationToSampleCount(skipLastUs));
 
         // Populate buffer with decoded data
         buffer.bufferIndex = bufferIndex; // Original decoder buffer index
         buffer.presentationTimeUs = presentationTimeUs;
         buffer.presentationTimeOffsetUs = presentationTimeOffsetUs;
-        buffer.startTimeUs = startTimeUs;
-        buffer.endTimeUs = endTimeUs;
         buffer.mute = mute;
-        buffer.data = data == null ? null : data.asShortBuffer();
+        buffer.data = data == null ? null : data;
 
         // Make sure we have an overflow buffer ready
         if (mOverflowBuffer.data == null && data != null) {
             mOverflowBuffer.data = ByteBuffer
-                    .allocateDirect(data.capacity())
+                    .allocateDirect(data.capacity() * 2)
                     .order(ByteOrder.nativeOrder())
                     .asShortBuffer();
             mOverflowBuffer.data.clear().flip();
@@ -350,7 +347,8 @@ class AudioChannel {
     private int durationToSampleCount(final long duration) {
         int sampleRate = mInputSampleRate;
         int channelCount = mInputChannelCount;
-        Long samples = ((duration * sampleRate * channelCount) + MICROSECS_PER_SEC - 1)/ MICROSECS_PER_SEC;
+        //Long samples = ((duration * sampleRate * channelCount) + MICROSECS_PER_SEC - 1)/ MICROSECS_PER_SEC;
+        Long samples = ((duration * sampleRate - sampleRate + 1) * channelCount) / MICROSECS_PER_SEC;
         return samples.intValue();
     }
 
@@ -399,15 +397,15 @@ class AudioChannel {
         int overflowBufferStartingPosition = 0;
 
         // Reset position to 0, and set limit to capacity (Since MediaCodec doesn't do that for us)
-        inBuff.clear();
-        outBuff.clear();
+        //inBuff.clear();
+        //outBuff.clear();
 
         TLog.v(TAG, "remixing buffer at " + (input.presentationTimeUs + input.presentationTimeOffsetUs) + " length " +  sampleCountToInputDurationUs(inBuff.remaining()));
 
         if (inBuff.remaining() > outBuff.remaining()) {
             // Overflow
             // Limit inBuff to outBuff's capacity
-            inBuff.limit(outBuff.capacity());
+            inBuff.limit(Math.max(inBuff.limit(),outBuff.capacity()));
 
             outputBufferStartingPosition = mRemixer.remix(inBuff, outBuff, append, position, input.mute);
 
@@ -427,6 +425,7 @@ class AudioChannel {
         } else {
             // No overflow
             outputBufferStartingPosition = mRemixer.remix(inBuff, outBuff, append, position, input.mute);
+            inBuff.limit(inBuff.capacity());
             //outBuff.flip();
         }
 

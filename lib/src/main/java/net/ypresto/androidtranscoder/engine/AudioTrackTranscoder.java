@@ -205,7 +205,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
         while ((timeEncodedUs = mAudioChannel.feedEncoder(0)) != null) {
             if (timeEncodedUs >= 0) {
-                TLog.v(TAG, "Encoded audio from at " + timeEncodedUs);
+                TLog.v(TAG, "Encoded audio duration " + timeEncodedUs);
                 mOutputPresentationTimeEncodedUs += timeEncodedUs;
             } else {
                 for (Map.Entry<String, DecoderWrapper> decoderWrapperEntry : mDecoderWrappers.entrySet()) {
@@ -311,7 +311,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                     decoderWrapper.mIsDecoderEOS = true;
                     segment.forceEndOfStream(mOutputPresentationTimeDecodedUs);
                     if (mIsLastSegment)
-                        mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, 0l, 0l, false, 0l);
+                        mAudioChannel.drainDecoderBufferAndQueue(channelName, BUFFER_INDEX_END_OF_STREAM, 0l, 0l, false, 0l, 0l);
                     else
                         decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
                     mAudioChannel.removeBuffers(channelName);
@@ -319,29 +319,47 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                             " IT:" + decoderWrapper.mBufferInfo.presentationTimeUs);
 
                 // Detect end of segment
-                } else if (inputChannel.mInputEndTimeUs != null && bufferInputStartTime >= inputChannel.mInputEndTimeUs) {
-                        decoderWrapper.requeueOutputBuffer();
+                } else if (inputChannel.mInputEndTimeUs != null && bufferInputEndTime >= inputChannel.mInputEndTimeUs) {
+
                         decoderWrapper.mIsSegmentEOS = true;
                         TLog.d(TAG, "End of Segment channel: " + channelName + " PT:" + mOutputPresentationTimeDecodedUs +
                                 " " + bufferInputStartTime + " >= " + inputChannel.mInputEndTimeUs);
 
+                        // If there is a partial buffer to submit, submit it
+                        if (bufferInputStartTime < inputChannel.mInputEndTimeUs) {
+                            inputChannel.mAudioInputAcutalEndTimeUs = inputChannel.mInputEndTimeUs;
+                            TLog.v(TAG, "Submitting Truncated Audio for Decoder " + channelName + " at " + bufferInputStartTime + " to " + inputChannel.mInputEndTimeUs);
+                            mOutputPresentationTimeDecodedUs = Math.max(inputChannel.mInputEndTimeUs + inputChannel.mAudioInputOffsetUs, mOutputPresentationTimeDecodedUs);
+                            mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs, inputChannel.mAudioInputOffsetUs,
+                                    inputChannel.mFilter == TimeLine.Filter.MUTE, 0l, bufferInputEndTime - inputChannel.mInputEndTimeUs);
+                        } else
+                            decoderWrapper.requeueOutputBuffer();
 
                 // Process a buffer with data
                 } else if (decoderWrapper.mBufferInfo.size > 0) {
 
                     // If we are before start skip entirely
                     if (bufferInputStartTime < inputChannel.mAudioInputStartTimeUs) {
-                        decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
-                        TLog.v(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
-                        throttle.canProceed("Audio" + channelName, bufferInputEndTime + inputChannel.mVideoInputOffsetUs, decoderWrapper.mIsDecoderEOS);
-                        inputChannel.mAudioInputAcutalEndTimeUs = bufferInputEndTime;
+                        // Completely before start time
+                        if (bufferInputEndTime < inputChannel.mAudioInputStartTimeUs) {
+                            decoderWrapper.mDecoder.releaseOutputBuffer(result, false);
+                            TLog.v(TAG, "Skipping Audio for Decoder " + channelName + " at " + bufferOutputTime);
+                            throttle.canProceed("Audio" + channelName, bufferInputEndTime + inputChannel.mVideoInputOffsetUs, decoderWrapper.mIsDecoderEOS);
+                            inputChannel.mAudioInputAcutalEndTimeUs = bufferInputEndTime;
+                        // Partially before start time
+                        } else {
+                            inputChannel.mAudioInputAcutalEndTimeUs = bufferInputEndTime;
+                            TLog.v(TAG, "Submitting Truncated Audio for Decoder " + channelName + " at " + inputChannel.mAudioInputStartTimeUs + " to " + bufferInputEndTime);
+                            mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
+                            mAudioChannel.drainDecoderBufferAndQueue(channelName, result, inputChannel.mAudioInputStartTimeUs,
+                                    inputChannel.mAudioInputOffsetUs, inputChannel.mFilter == TimeLine.Filter.MUTE, inputChannel.mAudioInputStartTimeUs - bufferInputStartTime, 0l);
+                        }
                     } else {
                         inputChannel.mAudioInputAcutalEndTimeUs = bufferInputEndTime;
                         TLog.v(TAG, "Submitting Audio for Decoder " + channelName + " at " + bufferOutputTime);
                         mOutputPresentationTimeDecodedUs = Math.max(bufferOutputEndTime, mOutputPresentationTimeDecodedUs);
                         mAudioChannel.drainDecoderBufferAndQueue(channelName, result, decoderWrapper.mBufferInfo.presentationTimeUs,
-                                inputChannel.mAudioInputOffsetUs, inputChannel.mAudioInputStartTimeUs, inputChannel.mInputEndTimeUs, inputChannel.mFilter == TimeLine.Filter.MUTE, inputChannel.mAudioToTrim);
-                        inputChannel.mAudioToTrim = 0l;
+                                inputChannel.mAudioInputOffsetUs, inputChannel.mFilter == TimeLine.Filter.MUTE, 0l, 0l);
                     }
                 }
             }

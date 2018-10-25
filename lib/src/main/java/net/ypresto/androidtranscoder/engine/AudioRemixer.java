@@ -60,8 +60,12 @@ public class AudioRemixer {
             } else {
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
                     // Convert to unsigned
-                    final int a = inSBuff.get();
-                    final int b = inSBuff.get();
+                    int a = inSBuff.get();
+                    int b = inSBuff.get();
+                    if(mute) {
+                        a = 0;
+                        b = 0;
+                    }
                     outBuffStartingPosition = outSBuff.position();
                     outSBuff.put(mix(a, b));
                 }
@@ -96,7 +100,10 @@ public class AudioRemixer {
                 }
             } else {
                 for (int i = 0; i < samplesToBeProcessed; ++i) {
-                    final short inSample = inSBuff.get();
+                    short inSample = inSBuff.get();
+                    if (mute) {
+                        inSample = 0;
+                    }
                     outBuffStartingPosition = outSBuff.position();
                     outSBuff.put(inSample);
                     outSBuff.put(inSample);

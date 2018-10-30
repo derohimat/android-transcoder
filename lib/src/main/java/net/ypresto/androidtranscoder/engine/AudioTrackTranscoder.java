@@ -334,6 +334,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
                                     inputChannel.mFilter == TimeLine.Filter.MUTE, 0l, bufferInputEndTime - inputChannel.mInputEndTimeUs);
                         } else
                             decoderWrapper.requeueOutputBuffer();
+                        mAudioChannel.setEndOfSegment(channelName);
 
                 // Process a buffer with data
                 } else if (decoderWrapper.mBufferInfo.size > 0) {

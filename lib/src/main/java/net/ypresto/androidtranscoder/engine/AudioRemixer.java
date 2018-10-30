@@ -120,7 +120,7 @@ public class AudioRemixer {
             int outBuffStartingPosition = 0;
             if (append) {
                 ShortBuffer outSBuffCopy = outSBuff.duplicate();
-                final int inRemaining = inSBuff.remaining();
+                final int inRemaining = inSBuff.remaining() / 2;
                 final int outSpace = outSBuff.remaining() / 2;
                 final int samplesToBeProcessed = Math.min(inRemaining, outSpace);
                 outBuffStartingPosition = outSBuff.position();

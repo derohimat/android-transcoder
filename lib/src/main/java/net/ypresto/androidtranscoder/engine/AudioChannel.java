@@ -50,6 +50,7 @@ class AudioChannel {
 
     private final LinkedHashMap<String, Queue<AudioBuffer>> mEmptyBuffers;
     private final LinkedHashMap<String, Queue<AudioBuffer>> mFilledBuffers;
+    private final LinkedHashMap<String, Boolean> mAtEndOfSegment;
     private final LinkedHashMap<String, MediaCodec> mDecoders;
     private final MediaCodec mEncoder;
     private final MediaFormat mEncodeFormat;
@@ -79,6 +80,7 @@ class AudioChannel {
         mDecoderBuffers = new LinkedHashMap<String, MediaCodecBufferCompatWrapper>();
         mEmptyBuffers = new LinkedHashMap<String, Queue<AudioBuffer>>();
         mFilledBuffers = new LinkedHashMap<String, Queue<AudioBuffer>>();
+        mAtEndOfSegment = new LinkedHashMap<String, Boolean>();
 
         for (Map.Entry<String, MediaCodec> entry : mDecoders.entrySet()) {
             MediaCodec decoder = entry.getValue();
@@ -87,6 +89,7 @@ class AudioChannel {
             Queue<AudioBuffer> filled = new ArrayDeque<>();
             mEmptyBuffers.put(entry.getKey(), empty);
             mFilledBuffers.put(entry.getKey(), filled);
+            mAtEndOfSegment.put(entry.getKey(), false);
         }
         mEncoderBuffers = new MediaCodecBufferCompatWrapper(mEncoder);
     }
@@ -128,6 +131,9 @@ class AudioChannel {
         mDecoderBuffers.remove(channelName);
         mEmptyBuffers.remove(channelName);
         mFilledBuffers.remove(channelName);
+    }
+    public void setEndOfSegment(String channelName) {
+        mAtEndOfSegment.put(channelName, true);
     }
     public void setActualDecodedFormat(final MediaFormat decodedFormat) {
         mActualDecodedFormat = decodedFormat;
@@ -253,7 +259,8 @@ class AudioChannel {
         // All channels must have filled buffers before we mix down
         for (Map.Entry<String, Queue<AudioBuffer>> entry : mFilledBuffers.entrySet()) {
             if (entry.getValue().isEmpty()) {
-                areAllFilled = false;
+                if (!mAtEndOfSegment.get(entry.getKey()))
+                    areAllFilled = false;
             } else {
                 someFilled = true;
             }
@@ -294,19 +301,21 @@ class AudioChannel {
         for (Map.Entry<String, Queue<AudioBuffer>> entry : mFilledBuffers.entrySet()) {
             Queue<AudioBuffer> filledBuffers = entry.getValue();
             final AudioBuffer decoderBuffer = filledBuffers.poll();
-            if (decoderBuffer.bufferIndex != BUFFER_INDEX_END_OF_STREAM) {
-                streamPresent = true;
-                RemixResult result = remixAndMaybeFillOverflow(decoderBuffer, mEncoderBuffer,
-                        append, position, overflowPosition);
-                position = result.mBufferPosition;
-                overflowPosition = result.mBufferOverflowPosition;
-                startingPresentationTimeUs = startingPresentationTimeUs < 0 ? result.mPresentationTime : startingPresentationTimeUs;
-                duration = sampleCountToOutputDurationUs(mEncoderBuffer.position());
-                TLog.v(TAG, "Released Decoder Buffer " + decoderBuffer.bufferIndex);
-                mEmptyBuffers.get(entry.getKey()).add(decoderBuffer);
-                append = true;
+            if (decoderBuffer != null) {
+                if (decoderBuffer.bufferIndex != BUFFER_INDEX_END_OF_STREAM) {
+                    streamPresent = true;
+                    RemixResult result = remixAndMaybeFillOverflow(decoderBuffer, mEncoderBuffer,
+                            append, position, overflowPosition);
+                    position = result.mBufferPosition;
+                    overflowPosition = result.mBufferOverflowPosition;
+                    startingPresentationTimeUs = startingPresentationTimeUs < 0 ? result.mPresentationTime : startingPresentationTimeUs;
+                    duration = sampleCountToOutputDurationUs(mEncoderBuffer.position());
+                    TLog.v(TAG, "Released Decoder Buffer " + decoderBuffer.bufferIndex);
+                    mEmptyBuffers.get(entry.getKey()).add(decoderBuffer);
+                    append = true;
+                }
+                mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
             }
-            mDecoders.get(entry.getKey()).releaseOutputBuffer(decoderBuffer.bufferIndex, false);
         }
         if (!streamPresent) {
             mEncoder.queueInputBuffer(mEncoderBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);

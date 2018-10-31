@@ -305,10 +305,10 @@ class AudioChannel {
                 if (decoderBuffer.bufferIndex != BUFFER_INDEX_END_OF_STREAM) {
                     streamPresent = true;
                     RemixResult result = remixAndMaybeFillOverflow(decoderBuffer, mEncoderBuffer,
-                            append, position, overflowPosition);
+                            append, 0, overflowPosition);
                     position = result.mBufferPosition;
                     overflowPosition = result.mBufferOverflowPosition;
-                    startingPresentationTimeUs = startingPresentationTimeUs < 0 ? result.mPresentationTime : startingPresentationTimeUs;
+                    startingPresentationTimeUs = Math.max(startingPresentationTimeUs, result.mPresentationTime);
                     duration = sampleCountToOutputDurationUs(mEncoderBuffer.position());
                     TLog.v(TAG, "Released Decoder Buffer " + decoderBuffer.bufferIndex);
                     mEmptyBuffers.get(entry.getKey()).add(decoderBuffer);
@@ -324,15 +324,16 @@ class AudioChannel {
             return null;
         } else {
             if (mEncoderBuffer.limit() > 0) {
-                if (mOutputPresentationTimeUs >= startingPresentationTimeUs) {
-                    TLog.d(TAG, "Duplicate presentation time " + startingPresentationTimeUs);
-                    startingPresentationTimeUs = mOutputPresentationTimeUs + 1; // Hack to prevent duplicates
-                }
-                mOutputPresentationTimeUs = startingPresentationTimeUs;
+                Long originalStartingPresentationTimeUs = startingPresentationTimeUs;
+                startingPresentationTimeUs = Math.max(mOutputPresentationTimeUs, startingPresentationTimeUs);
+                mOutputPresentationTimeUs = startingPresentationTimeUs + duration;
                 mEncoder.queueInputBuffer(mEncoderBufferIndex,
                         0, mEncoderBuffer.position() * BYTES_PER_SHORT,
                         startingPresentationTimeUs, 0);
-                TLog.v(TAG, "Submitting audio encoder buffer at " + startingPresentationTimeUs + " bytes: " + mEncoderBuffer.position() * BYTES_PER_SHORT);
+                TLog.v(TAG, "Encoding audio PT: " + startingPresentationTimeUs +
+                        " duration: " + duration +
+                        " adjustment " + (startingPresentationTimeUs - originalStartingPresentationTimeUs) +
+                        " samples: " + mEncoderBuffer.position());
 
                 mEncoderBuffer = null;
             } else {
@@ -356,6 +357,13 @@ class AudioChannel {
     private int durationToSampleCount(final long duration) {
         int sampleRate = mInputSampleRate;
         int channelCount = mInputChannelCount;
+        //Long samples = ((duration * sampleRate * channelCount) + MICROSECS_PER_SEC - 1)/ MICROSECS_PER_SEC;
+        Long samples = ((duration * sampleRate - sampleRate + 1) * channelCount) / MICROSECS_PER_SEC;
+        return samples.intValue();
+    }
+    private int durationToOutputSampleCount(final long duration) {
+        int sampleRate = mInputSampleRate;
+        int channelCount = mOutputChannelCount;
         //Long samples = ((duration * sampleRate * channelCount) + MICROSECS_PER_SEC - 1)/ MICROSECS_PER_SEC;
         Long samples = ((duration * sampleRate - sampleRate + 1) * channelCount) / MICROSECS_PER_SEC;
         return samples.intValue();
@@ -408,6 +416,11 @@ class AudioChannel {
         // Reset position to 0, and set limit to capacity (Since MediaCodec doesn't do that for us)
         //inBuff.clear();
         //outBuff.clear();
+        //outBuff.limit(outBuff.capacity() / 2);
+
+        if (append)
+            outBuff.position(position);
+        position = 0;
 
         TLog.v(TAG, "remixing buffer at " + (input.presentationTimeUs + input.presentationTimeOffsetUs) + " length " +  sampleCountToInputDurationUs(inBuff.remaining()));
 
@@ -428,7 +441,7 @@ class AudioChannel {
             overflowBufferStartingPosition = mRemixer.remix(inBuff, overflowBuff, append, overflowPosition, input.mute);
 
             // Seal off overflowBuff & mark limit
-            overflowBuff.flip();
+            //overflowBuff.flip();
             mOverflowBuffer.presentationTimeUs = input.presentationTimeUs + consumedDurationUs +
             input.presentationTimeOffsetUs;
         } else {

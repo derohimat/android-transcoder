@@ -38,7 +38,7 @@ public class SingleFileTranscoderTest {
     static private String inputFileName2;
     static private String inputFileName3;
     private static String status = "not started";
-    static private int LogLevelForTests = 3;
+    static private int LogLevelForTests = 2;
 
     static MediaTranscoder.Listener  listener = new MediaTranscoder.Listener() {
         @Override

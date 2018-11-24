@@ -60,7 +60,6 @@ public class SingleFileTranscoderTest {
         }
     };
 
-
     @BeforeClass
     public static void retrieveVideo ()  {
         inputFileName1 = InstrumentationRegistry.getTargetContext().getExternalFilesDir(null) + "/input1.mp4";

@@ -84,11 +84,13 @@ class TextureRender {
     private int maTextureHandle;
     private int [] muTextures = new int[4];
     private int [] muAlphas = new int[4];
+    private boolean mFlip;
     List<OutputSurface> mOutputSurfaces;
     static int mGLESTextures [] = {GLES20.GL_TEXTURE0, GLES20.GL_TEXTURE1, GLES20.GL_TEXTURE2, GLES20.GL_TEXTURE3, GLES20.GL_TEXTURE4};
 
 
-    public TextureRender(List<OutputSurface> outputSurfaces) {
+    public TextureRender(List<OutputSurface> outputSurfaces, boolean flip) {
+        mFlip = flip;
         mOutputSurfaces = outputSurfaces;
         mTriangleVertices = ByteBuffer.allocateDirect(
                 mTriangleVerticesData.length * FLOAT_SIZE_BYTES)
@@ -127,6 +129,10 @@ class TextureRender {
         GLES20.glEnableVertexAttribArray(maTextureHandle);
         checkGlError("glEnableVertexAttribArray maTextureHandle");
         Matrix.setIdentityM(mMVPMatrix, 0);
+
+        if (mFlip)
+            Matrix.rotateM(mMVPMatrix, 0, 180, 0, 0, 1);
+
         GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mMVPMatrix, 0);
         GLES20.glUniformMatrix4fv(muSTMatrixHandle, 1, false, mSTMatrix, 0);
         //GLES20.glEnable(GLES20.GL_BLEND);

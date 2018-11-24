@@ -283,6 +283,10 @@ public class MediaTranscoderEngine {
                             TLog.d(TAG, "Frame Length of " + channelName + ": " + frameLength);
                             inputChannel.mVideoFrameLength = frameLength;
                         }
+                        if (format.containsKey(MediaFormat.KEY_ROTATION) && format.getInteger(MediaFormat.KEY_ROTATION) == 180) {
+                            inputChannel.mFlip = true;;
+                        }
+
                     }
                 }
             }

@@ -194,7 +194,7 @@ public class TimeLine {
         }
     }
 
-    public enum Filter {OPACITY_UP_RAMP, OPACITY_DOWN_RAMP, MUTE};
+    public enum Filter {OPACITY_UP_RAMP, OPACITY_DOWN_RAMP, MUTE, SUPPRESS};
     public enum ChannelType {VIDEO, AUDIO, AUDIO_VIDEO, IMAGE}
 
     /**
@@ -209,7 +209,7 @@ public class TimeLine {
         public Long mAudioInputOffsetUs = 0l;
         public Long mVideoInputAcutalEndTimeUs =0l;
         public Long mAudioInputAcutalEndTimeUs =0l;
-        public long mAudioToTrim = 0l;
+        public boolean mFlip = false;
         public long mVideoFrameLength = 1000000 / 24;
         public long mSeekShortage = 0l;
         public long mDurationShortage = 0l;
@@ -248,12 +248,22 @@ public class TimeLine {
         public void start (Long presentationTime, Segment previousSegment, Long videoPresentationTime, Long audioPresentationTime, Long videoEncodedTime, Long audioEncodedTime) {
 
             mOutputStartTimeUs = presentationTime;
+            InputChannel rampUp = null;
+            InputChannel rampDown = null;
+
 
             for (HashMap.Entry<String, SegmentChannel> segmentChannelEntry : mSegmentChannels.entrySet()) {
 
                 SegmentChannel segmentChannel = segmentChannelEntry.getValue();
                 String channelName = segmentChannelEntry.getKey();
                 InputChannel inputChannel = segmentChannel.mChannel;
+
+                // If rotation different don't crossfade
+                if (inputChannel.mFilter == Filter.OPACITY_DOWN_RAMP)
+                    rampDown = inputChannel;
+                if (inputChannel.mFilter == Filter.OPACITY_UP_RAMP)
+                    rampUp = inputChannel;
+
                 boolean channelInPreviousSegment = previousSegment != null && previousSegment.mSegmentChannels.get(channelName)  != null;
 
                 Long actualSeek = mSeeks.get(channelName) != null ?  mSeeks.get(channelName) : 0l;
@@ -299,6 +309,12 @@ public class TimeLine {
                         " VET:" + videoEncodedTime +
                         " AET:" + audioEncodedTime +
                         " drift:" + (videoPresentationTime - audioPresentationTime));
+            }
+            if (rampUp != null && rampDown != null && rampUp.mFlip != rampDown.mFlip) {
+                if (rampDown.mFlip)
+                    rampDown.mFlip = false;
+                rampUp.mFilter = null;
+                rampDown.mFilter = Filter.SUPPRESS;
             }
         }
 

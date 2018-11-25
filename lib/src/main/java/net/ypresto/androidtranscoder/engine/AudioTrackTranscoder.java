@@ -149,7 +149,7 @@ public class AudioTrackTranscoder implements TrackTranscoder {
 
     }
     @Override
-    public void setupDecoders(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle) {
+    public void setupDecoders(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle, int outputRotation) {
 
         LinkedHashMap<String, MediaCodec> decoders = new LinkedHashMap<String, MediaCodec>();
 

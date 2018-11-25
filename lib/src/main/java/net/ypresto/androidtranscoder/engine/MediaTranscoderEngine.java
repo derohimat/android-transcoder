@@ -49,6 +49,7 @@ public class MediaTranscoderEngine {
     private ProgressCallback mProgressCallback;
     private long mDurationUs;
     private long mOutputPresentationTimeUs = 0l;
+    int mOutputRotation = 0;
 
     /**
      * The throttle ensures that an encoder doesn't overrun another encoder and produce output
@@ -171,7 +172,12 @@ public class MediaTranscoderEngine {
             if (mFirstFileDescriptorWithVideo == null) {
                 throw new IllegalStateException("Data source is not set.");
             }
-            setupMetadata();
+            try {
+                mMuxer.setOrientationHint(mOutputRotation);
+            } catch (NumberFormatException e) {
+                TLog.e(TAG, "Unable to set orientaiton in Muxer");
+            }
+
             runPipelines(timeLine);
             mMuxer.stop();
             TLog.d(TAG, "Muxer Stopped");
@@ -207,22 +213,6 @@ public class MediaTranscoderEngine {
         }
     }
 
-    private void setupMetadata() throws IOException {
-        MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
-        mediaMetadataRetriever.setDataSource(mFirstFileDescriptorWithVideo);
-
-        String rotationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
-        try {
-            mMuxer.setOrientationHint(Integer.parseInt(rotationString));
-        } catch (NumberFormatException e) {
-            // skip
-        }
-
-        // TODO: parse ISO 6709
-        // String locationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION);
-        // mMuxer.setLocation(Integer.getInteger(rotationString, 0));
-
-    }
 
     /**
      * Setup MediaExtractors for ever possible case in each output segment but defer connecting
@@ -283,9 +273,11 @@ public class MediaTranscoderEngine {
                             TLog.d(TAG, "Frame Length of " + channelName + ": " + frameLength);
                             inputChannel.mVideoFrameLength = frameLength;
                         }
+                        /*
                         if (format.containsKey(MediaFormat.KEY_ROTATION) && format.getInteger(MediaFormat.KEY_ROTATION) == 180) {
                             inputChannel.mFlip = true;;
                         }
+                        */
 
                     }
                 }
@@ -327,6 +319,11 @@ public class MediaTranscoderEngine {
         } else {
             mVideoTrackTranscoder = new VideoTrackTranscoder(mVideoExtractor, videoOutputFormat, queuedMuxer);
         }
+
+        MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
+        mediaMetadataRetriever.setDataSource(mFirstFileDescriptorWithVideo);
+        mOutputRotation = Integer.parseInt(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION));
+
         mVideoTrackTranscoder.setupEncoder();
 
         if (audioOutputFormat == null) {
@@ -359,8 +356,8 @@ public class MediaTranscoderEngine {
             //mAudioTrackTranscoder.setOutputPresentationTimeDecodedUs(presentationTime);
             //mVideoTrackTranscoder.setOutputPresentationTimeDecodedUs(presentationTime);
             mThrottle.startSegment();
-            mAudioTrackTranscoder.setupDecoders(outputSegment, mThrottle);
-            mVideoTrackTranscoder.setupDecoders(outputSegment, mThrottle);
+            mAudioTrackTranscoder.setupDecoders(outputSegment, mThrottle, mOutputRotation);
+            mVideoTrackTranscoder.setupDecoders(outputSegment, mThrottle, mOutputRotation);
             while (!(mVideoTrackTranscoder.isSegmentFinished() && mAudioTrackTranscoder.isSegmentFinished())) {
 
                 boolean videoStepped = mVideoTrackTranscoder.stepPipeline(outputSegment, mThrottle);

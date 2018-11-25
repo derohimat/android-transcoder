@@ -56,7 +56,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             mExtractor = mediaExtractor;
         }
 
-        public void start() {
+        public void start(int outputRotation) {
             mOutputSurface = new OutputSurface();
             MediaExtractorUtils.TrackResult trackResult = MediaExtractorUtils.getFirstVideoAndAudioTrack(mExtractor);
             if (trackResult.mVideoTrackFormat != null) {
@@ -64,7 +64,8 @@ public class VideoTrackTranscoder implements TrackTranscoder {
                 mTrackIndex = trackIndex;
                 mExtractor.selectTrack(trackIndex);
                 MediaFormat inputFormat = mExtractor.getTrackFormat(trackIndex);
-                if (inputFormat.containsKey(MediaFormatExtraConstants.KEY_ROTATION_DEGREES)) {
+                if (inputFormat.containsKey(MediaFormatExtraConstants.KEY_ROTATION_DEGREES) &&
+                    inputFormat.getInteger(MediaFormatExtraConstants.KEY_ROTATION_DEGREES) == outputRotation) {
                     // Decoded video is rotated automatically in Android 5.0 lollipop.
                     // Turn off here because we don't want to encode rotated one.
                     // refer: https://android.googlesource.com/platform/frameworks/av/+blame/lollipop-release/media/libstagefright/Utils.cpp
@@ -195,7 +196,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
      * @param segment
      */
     @Override
-    public void setupDecoders(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle) {
+    public void setupDecoders(TimeLine.Segment segment, MediaTranscoderEngine.TranscodeThrottle throttle, int outputRotation) {
 
           // Start any decoders being opened for the first time
 
@@ -211,7 +212,7 @@ public class VideoTrackTranscoder implements TrackTranscoder {
             decoderWrapper.mIsSegmentEOS = false;
             if (!decoderWrapper.mDecoderStarted) {
                 TLog.d(TAG, "setupDecoders starting decoder for " + channelName);
-                decoderWrapper.start();
+                decoderWrapper.start(outputRotation);
             }
 
         }

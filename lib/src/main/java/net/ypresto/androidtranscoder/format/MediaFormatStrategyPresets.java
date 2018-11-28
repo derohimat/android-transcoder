@@ -45,7 +45,6 @@ public class MediaFormatStrategyPresets {
     /**
      * Preset based on Nexus 4 camera recording with 720p quality.
      * This preset is ensured to work on any Android &gt;=4.3 devices by Android CTS (if codec is available).
-     * <p/>
      * Note: audio transcoding is experimental feature.
      *
      * @param bitrate       Preferred bitrate for video encoding.
@@ -54,6 +53,24 @@ public class MediaFormatStrategyPresets {
      */
     public static MediaFormatStrategy createAndroid720pStrategy(int bitrate, int audioBitrate, int audioChannels) {
         return new Android720pFormatStrategy(bitrate, audioBitrate, audioChannels);
+    }
+
+    /**
+     *
+     * @param audioBitrate  Preferred bitrate for audio encoding.
+     * @param audioChannels Output audio channels.
+     */
+    public static MediaFormatStrategy createAndroid16x9Strategy720P(int audioBitrate, int audioChannels) {
+        return new Android16By9FormatStrategy(720, 8000000, audioBitrate, audioChannels);
+    }
+
+    /**
+     *
+     * @param audioBitrate  Preferred bitrate for audio encoding.
+     * @param audioChannels Output audio channels.
+     */
+    public static MediaFormatStrategy createAndroid16x9Strategy1080P(int audioBitrate, int audioChannels) {
+        return new Android16By9FormatStrategy(1080, 10000000, audioBitrate, audioChannels);
     }
 
     /**

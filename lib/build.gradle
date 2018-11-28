@@ -3,7 +3,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.novoda:bintray-release:0.2.4'
+        classpath 'com.novoda:bintray-release:0.8.0'
     }
 }
 
@@ -12,7 +12,7 @@ apply plugin: 'bintray-release'
 
 android {
     compileSdkVersion 24
-    buildToolsVersion "24.0.1"
+    buildToolsVersion '25.0.0'
 
     defaultConfig {
         minSdkVersion 18

@@ -18,7 +18,7 @@ package net.ypresto.androidtranscoder.engine;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
-import android.util.Log;
+import net.ypresto.androidtranscoder.TLog;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -30,7 +30,7 @@ import java.util.List;
  */
 public class QueuedMuxer {
     private static final String TAG = "QueuedMuxer";
-    private static final int BUFFER_SIZE = 64 * 1024; // I have no idea whether this value is appropriate or not...
+    private static final int BUFFER_SIZE = 512 * 1024; // I have no idea whether this value is appropriate or not...
     private final MediaMuxer mMuxer;
     private final Listener mListener;
     private MediaFormat mVideoFormat;
@@ -66,9 +66,9 @@ public class QueuedMuxer {
         mListener.onDetermineOutputFormat();
 
         mVideoTrackIndex = mMuxer.addTrack(mVideoFormat);
-        Log.v(TAG, "Added track #" + mVideoTrackIndex + " with " + mVideoFormat.getString(MediaFormat.KEY_MIME) + " to muxer");
+        TLog.v(TAG, "Added track #" + mVideoTrackIndex + " with " + mVideoFormat.getString(MediaFormat.KEY_MIME) + " to muxer");
         mAudioTrackIndex = mMuxer.addTrack(mAudioFormat);
-        Log.v(TAG, "Added track #" + mAudioTrackIndex + " with " + mAudioFormat.getString(MediaFormat.KEY_MIME) + " to muxer");
+        TLog.v(TAG, "Added track #" + mAudioTrackIndex + " with " + mAudioFormat.getString(MediaFormat.KEY_MIME) + " to muxer");
         mMuxer.start();
         mStarted = true;
 
@@ -76,7 +76,7 @@ public class QueuedMuxer {
             mByteBuffer = ByteBuffer.allocate(0);
         }
         mByteBuffer.flip();
-        Log.v(TAG, "Output format determined, writing " + mSampleInfoList.size() +
+        TLog.v(TAG, "Output format determined, writing " + mSampleInfoList.size() +
                 " samples / " + mByteBuffer.limit() + " bytes to muxer.");
         MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
         int offset = 0;

@@ -1,10 +1,11 @@
-package net.ypresto.androidtranscoder.engine;
+package net.ypresto.androidtranscoder.transcode;
 
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 
 import net.ypresto.androidtranscoder.compat.MediaCodecBufferCompatWrapper;
+import net.ypresto.androidtranscoder.engine.QueuedMuxer;
 
 import java.io.IOException;
 
@@ -21,7 +22,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
     private long mWrittenPresentationTimeUs;
 
     private final int mTrackIndex;
-    private final MediaFormat mInputFormat;
     private final MediaFormat mOutputFormat;
 
     private final MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
@@ -46,8 +46,6 @@ public class AudioTrackTranscoder implements TrackTranscoder {
         mTrackIndex = trackIndex;
         mOutputFormat = outputFormat;
         mMuxer = muxer;
-
-        mInputFormat = mExtractor.getTrackFormat(mTrackIndex);
     }
 
     @Override

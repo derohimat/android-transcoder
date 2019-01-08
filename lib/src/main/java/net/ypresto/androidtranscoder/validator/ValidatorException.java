@@ -13,10 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.ypresto.androidtranscoder.format;
+package net.ypresto.androidtranscoder.validator;
 
-public class OutputFormatUnavailableException extends RuntimeException {
-    public OutputFormatUnavailableException(String detailMessage) {
+import net.ypresto.androidtranscoder.strategy.OutputStrategy;
+
+import androidx.annotation.Nullable;
+
+/**
+ * An exception thrown internally when a {@link Validator}
+ * returns false. Not to be used.
+ */
+public class ValidatorException extends RuntimeException {
+
+    public ValidatorException(String detailMessage) {
         super(detailMessage);
     }
 }

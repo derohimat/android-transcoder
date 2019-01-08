@@ -11,9 +11,9 @@ import java.nio.ByteBuffer;
  */
 public class MediaCodecBufferCompatWrapper {
 
-    final MediaCodec mMediaCodec;
-    final ByteBuffer[] mInputBuffers;
-    final ByteBuffer[] mOutputBuffers;
+    private final MediaCodec mMediaCodec;
+    private final ByteBuffer[] mInputBuffers;
+    private ByteBuffer[] mOutputBuffers;
 
     public MediaCodecBufferCompatWrapper(MediaCodec mediaCodec) {
         mMediaCodec = mediaCodec;
@@ -38,5 +38,11 @@ public class MediaCodecBufferCompatWrapper {
             return mMediaCodec.getOutputBuffer(index);
         }
         return mOutputBuffers[index];
+    }
+
+    public void onOutputBuffersChanged() {
+        if (Build.VERSION.SDK_INT < 21) {
+            mOutputBuffers = mMediaCodec.getOutputBuffers();
+        }
     }
 }

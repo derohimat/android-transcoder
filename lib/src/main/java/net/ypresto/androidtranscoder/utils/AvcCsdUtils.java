@@ -17,8 +17,6 @@ package net.ypresto.androidtranscoder.utils;
 
 import android.media.MediaFormat;
 
-import net.ypresto.androidtranscoder.format.MediaFormatExtraConstants;
-
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -37,7 +35,7 @@ public class AvcCsdUtils {
      * @return ByteBuffer contains SPS without NAL header.
      */
     public static ByteBuffer getSpsBuffer(MediaFormat format) {
-        ByteBuffer sourceBuffer = format.getByteBuffer(MediaFormatExtraConstants.KEY_AVC_SPS).asReadOnlyBuffer(); // might be direct buffer
+        ByteBuffer sourceBuffer = format.getByteBuffer(MediaFormatConstants.KEY_AVC_SPS).asReadOnlyBuffer(); // might be direct buffer
         ByteBuffer prefixedSpsBuffer = ByteBuffer.allocate(sourceBuffer.limit()).order(sourceBuffer.order());
         prefixedSpsBuffer.put(sourceBuffer);
         prefixedSpsBuffer.flip();
@@ -60,7 +58,7 @@ public class AvcCsdUtils {
         byte[] prefix4 = Arrays.copyOf(prefix3, 4);
         prefix4[3] = prefixedSpsBuffer.get();
         if (Arrays.equals(prefix4, AVC_START_CODE_4)) return;
-        throw new IllegalStateException("AVC NAL start code does not found in csd.");
+        throw new IllegalStateException("AVC NAL start code not found in csd.");
     }
 
     private AvcCsdUtils() {

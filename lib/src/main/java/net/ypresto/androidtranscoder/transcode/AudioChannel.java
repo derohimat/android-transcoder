@@ -1,9 +1,10 @@
-package net.ypresto.androidtranscoder.engine;
+package net.ypresto.androidtranscoder.transcode;
 
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 
 import net.ypresto.androidtranscoder.compat.MediaCodecBufferCompatWrapper;
+import net.ypresto.androidtranscoder.remix.AudioRemixer;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -64,6 +65,9 @@ class AudioChannel {
 
     public void setActualDecodedFormat(final MediaFormat decodedFormat) {
         mActualDecodedFormat = decodedFormat;
+
+        // TODO I think these exceptions are either useless or not in the right place.
+        // We have MediaFormatValidator doing this kind of stuff.
 
         mInputSampleRate = mActualDecodedFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE);
         if (mInputSampleRate != mEncodeFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)) {
